@@ -1,0 +1,9 @@
+[submodule "github.com/jacobsa/fuse"]
+	path = vendor/github.com/jacobsa/fuse
+	url = https://github.com/jacobsa/fuse.git
+[submodule "github.com/urfave/cli"]
+	path = vendor/github.com/urfave/cli
+	url = https://github.com/urfave/cli.git
+[submodule "github.com/sevlyar/go-daemon"]
+	path = vendor/github.com/sevlyar/go-daemon
+	url = https://github.com/sevlyar/go-daemon.git
