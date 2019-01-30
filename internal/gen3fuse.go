@@ -14,14 +14,16 @@ import (
 	"github.com/jacobsa/fuse/fuseutil"
 	"net/http"
 	"strconv"
+	"bytes"
 	"strings"
 )
 
 type Gen3Fuse struct {
 	fuseutil.NotImplementedFileSystem
+
 	accessToken string
 
-	DIDs []manifestRecord
+	DIDs []string
 
 	inodes map[fuseops.InodeID]inodeInfo
 
@@ -34,12 +36,17 @@ type manifestRecord struct {
 	Uuid       string  `json:"uuid"`
 }
 
+type indexdResponse struct {
+	Filename string `json:"file_name"`
+	Filesize uint64 `json:"size"`
+	DID string `json:"did"`
+}
+
 var LogFilePath string = "fuse_log.txt"
 
-func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestURL string) (fs *Gen3Fuse, err error) {
+func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFilePath string) (fs *Gen3Fuse, err error) {
 	LogFilePath = gen3FuseConfig.LogFilePath
 
-	// Authenticate with Workspace Token Service. TODO: check for failure
 	err = ConnectWithFence(gen3FuseConfig)
 	if err != nil {
 		return nil, err
@@ -52,22 +59,27 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestUR
 		gen3FuseConfig: gen3FuseConfig,
 	}
 
-	var structStr string = fmt.Sprintf("%#v", gen3FuseConfig)
-	FuseLog("\nLoaded Gen3FuseConfig: " + structStr + "\n")
-
-	b, err := ioutil.ReadFile(manifestURL)
+	err = fs.LoadDIDsFromManifest(manifestFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	manifestJSON := make([]manifestRecord, 0)
-	json.Unmarshal(b, &manifestJSON)
+	var didToFileInfo map[string]*indexdResponse
+	if len(fs.DIDs) == 0 {
+		FuseLog("Warning: no DIDs were obtained from the manifest.")
+	} else {
+		didToFileInfo, err = fs.GetFileNamesAndSizes()
+		if err != nil {
+			return nil, err
+		}
 
-	fmt.Println("manifestJSON: ", manifestJSON)
+		var structStr string = fmt.Sprintf("%#v", didToFileInfo)
+		FuseLog("\n Indexd response: " + structStr + "\n")
+	}
 
-	fs.DIDs = append(fs.DIDs, manifestJSON...)
+	
 
-	fs.inodes = InitializeInodes(fs.DIDs)
+	fs.inodes = InitializeInodes(didToFileInfo)
 
 	return fs, nil
 }
@@ -86,12 +98,9 @@ type inodeInfo struct {
 
 	// For files, the presigned URL
 	presignedUrl string
-
-	// For files, the file body (this is ok right?)
-	fileBody string // TODO: adjust type to match response body
 }
 
-func InitializeInodes(DIDs []manifestRecord) map[fuseops.InodeID]inodeInfo {
+func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.InodeID]inodeInfo {
 	/*
 		Create a file system with a fixed structure described by the manifest
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
@@ -124,14 +133,13 @@ func InitializeInodes(DIDs []manifestRecord) map[fuseops.InodeID]inodeInfo {
 	// Create an inode for each imaginary file
 	var filesInManifest = []fuseutil.Dirent{}
 	var inodeID fuseops.InodeID = fuseops.RootInodeID + 2
-	var numFiles = len(DIDs)
-
-	for i := 0; i < numFiles; i++ {
-		// TODO: make portable between different commons' node type things
-		var filename = DIDs[i].Uuid
+	
+	k := 0
+	for did, fileInfo := range didToFileInfo {
+		var filename = fileInfo.Filename  // TODO: Determine whether the true filename is preferable, or just the DID
 
 		var dirEntry = fuseutil.Dirent{
-			Offset: fuseops.DirOffset(i + 1),
+			Offset: fuseops.DirOffset(k + 1),
 			Inode:  inodeID,
 			Name:   filename,
 			Type:   fuseutil.DT_File,
@@ -143,13 +151,13 @@ func InitializeInodes(DIDs []manifestRecord) map[fuseops.InodeID]inodeInfo {
 			attributes: fuseops.InodeAttributes{
 				Nlink: 1,
 				Mode:  0444,
-				Size:  6, // An arbitrary non-zero size to ensure that OpenFile is called
+				Size:  fileInfo.Filesize,
 			},
-			DID: DIDs[i].Uuid,
-			fileBody: "", // Contents are only stored in memory during the OpenFile call, and cleared out after the ReadFile call
+			DID: did,
 		}
 
 		inodeID += 1
+		k += 1
 	}
 
 	// inode for directory that contains the imaginary files described in the manifest
@@ -177,6 +185,21 @@ func findChildInode(
 	}
 
 	err = fuse.ENOENT
+	return
+}
+
+func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
+	b, err := ioutil.ReadFile(manifestFilePath)
+	if err != nil {
+		return err
+	}
+
+	manifestJSON := make([]manifestRecord, 0)
+	json.Unmarshal(b, &manifestJSON)
+
+	for i := 0; i < len(manifestJSON); i++ {
+		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
+	}
 	return
 }
 
@@ -301,11 +324,6 @@ func (fs *Gen3Fuse) OpenFile(
 			return err
 		} 
 		info.presignedUrl = presignedUrl
-		var fileBody string = FetchContentsAtURL(info.presignedUrl)
-		var fileSize = uint64(len(fileBody))
-		info.attributes.Size = fileSize
-		info.fileBody = fileBody
-		fs.inodes[op.Inode] = info
 	}
 
 	fs.inodes[op.Inode] = info
@@ -322,14 +340,27 @@ func (fs *Gen3Fuse) ReadFile(
 		err = fuse.ENOENT
 		return
 	}
+	FuseLog(info.presignedUrl)
+	fileBody, err := FetchContentsAtURL(info.presignedUrl)
+	
+	if err != nil {
+		FuseLog("Error fetching file contents: " + err.Error())
+		err = fuse.ENOENT
+		return err
+	}
+	
+	reader := strings.NewReader(string(fileBody))
 
-	reader := strings.NewReader(info.fileBody)
-
+	// op.Offset: The offset within the file at which to read.
+	// op.Dst: The destination buffer, whose length gives the size of the read.
 	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
+	FuseLog(string(op.Dst))
 
-	// Clear out the file contents; we don't want all these files stored in memory
-	info.fileBody = ""
-	fs.inodes[op.Inode] = info
+	if err != nil {
+		FuseLog("Error reading file: " + err.Error())
+		return err
+
+	}
 
 	// Special case: FUSE doesn't expect us to return io.EOF.
 	if err == io.EOF {
@@ -341,6 +372,35 @@ func (fs *Gen3Fuse) ReadFile(
 
 type presignedURLResponse struct {
 	Url string
+}
+
+func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*indexdResponse, err error) {
+	resp, err := fs.FetchBulkSizeResponseFromIndexd()
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		return fs.FileInfoFromIndexdResponse(resp)
+	} else if resp.StatusCode == 401 {
+		// get a new access token, try again just one more time
+		FuseLog("Got 401, retrying...")
+		fs.accessToken = GetAccessToken(fs.gen3FuseConfig)
+		respRetry, err := fs.FetchBulkSizeResponseFromIndexd()
+		if err != nil {
+			return nil, err
+		}
+
+		defer respRetry.Body.Close()
+
+		if resp.StatusCode == 200 {
+			return fs.FileInfoFromIndexdResponse(resp)
+		}
+	}
+
+	return nil, fs.HandleFenceError(resp)
 }
 
 func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
@@ -373,29 +433,38 @@ func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error)
 }
 
 func (fs *Gen3Fuse) HandleFenceError(resp *http.Response) (err error) {
-	FuseLog("Fetching presigned URL failed! \nThe Response code was " + strconv.Itoa(resp.StatusCode)) // +  ". Access token: " + fs.accessToken)
+	FuseLog("\nFetching presigned URL failed. \nThe Response code was " + strconv.Itoa(resp.StatusCode))
+
+	if resp.StatusCode == 401 {
+		FuseLog("Fence denied access based on the authentication provided. \nThis may be due to an improperly configured Workspace Token Service, or an outdated api key.")
+	}
+	FuseLog("The full error page is below:\n")
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 	FuseLog(bodyString)
 	return fuse.EIO
 }
 
-func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
+func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
+	FuseLog("\nFetching file sizes from Indexd failed. \nThe Response code was " + strconv.Itoa(resp.StatusCode))
+
+	if resp.StatusCode == 401 {
+		FuseLog("Indexd denied access based on the authentication provided. \nThis may be due to an improperly configured Workspace Token Service, or an outdated api key.")
+	}
+	FuseLog("The full error page is below:\n")
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 	FuseLog(bodyString)
-
-	var urlResponse presignedURLResponse
-	json.Unmarshal([]byte(bodyString), &urlResponse)
-	return urlResponse.Url
+	return fuse.EIO
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePath+fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.FenceBaseURL + fs.gen3FuseConfig.FencePresignedURLPath, DID)
 	FuseLog("GET " + requestUrl)
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
 	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
+	req.Header.Add("Accept", "application/json")
 
 	if err != nil {
 		FuseLog(err.Error() + " (" + DID + ") ")
@@ -411,22 +480,87 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 	return resp, nil
 }
 
-func FetchContentsAtURL(presignedUrl string) (stringData string) {
+func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+	FuseLog(bodyString)
+
+	var urlResponse presignedURLResponse
+	json.Unmarshal([]byte(bodyString), &urlResponse)
+	return urlResponse.Url
+}
+
+func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err error) {
+	requestUrl := fs.gen3FuseConfig.IndexdBaseURL + fs.gen3FuseConfig.IndexdBulkFileInfoPath
+	
+	var DIDsWithQuotes []string
+	for _, x := range fs.DIDs {
+		DIDsWithQuotes = append(DIDsWithQuotes, "\"" + x + "\"")
+	}
+
+	postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
+
+	FuseLog("POST " + requestUrl + "\n" + postData)
+
+	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer(  []byte(postData)   ))
+	req.Header.Add("Authorization", "Bearer "+ fs.accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	if err != nil {
+		FuseLog(err.Error())
+		return nil, err
+	}
+	resp, err = myClient.Do(req)
+
+	if err != nil {
+		FuseLog(err.Error())
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileInfo map[string]*indexdResponse, err error) { 
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+
+	FuseLog("Indexd response: " + bodyString)
+
+	didToFileInfoList := make([]indexdResponse, 0)
+	json.Unmarshal([]byte(bodyString), &didToFileInfoList)
+
+	didToFileInfo = make(map[string]*indexdResponse, 0)
+	for i := 0; i < len(didToFileInfoList); i++ {
+		didToFileInfo[didToFileInfoList[i].DID] = &indexdResponse{ 
+			Filesize : didToFileInfoList[i].Filesize, 
+			Filename: didToFileInfoList[i].Filename,
+		}
+	}
+
+	return didToFileInfo, nil
+}
+
+func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
 	FuseLog("\nGET " + presignedUrl)
+
 	resp, err := http.Get(presignedUrl)
 	if err != nil {
 		FuseLog(err.Error())
-		return ""
+		return byteContents, err
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	
+	//var structStr string = fmt.Sprintf("%#v", resp.Header["Content-Length"])
+	//FuseLog("\n Get size: " + structStr + "\n")
+
+	byteContents, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		FuseLog("Error reading file at " + presignedUrl)
-		return ""
+		return byteContents, err
 	}
 
-	return string(data)
+	return byteContents, err
 }
 
 func FuseLog(message string) {

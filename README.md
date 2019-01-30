@@ -13,9 +13,9 @@ would like to perform analysis on in her workspace.
 
     [
         {
-            "uuid": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
+            "uuid": "7612",
             "subject_id": "10",
-            "object_id" : "7612",
+            "object_id" : "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
         },
         ...
     ]
@@ -52,15 +52,20 @@ You can choose where errors are logged in config.yaml. By default they are logge
     go get -u gopkg.in/yaml.v2
     go get -u github.com/gorilla/mux
 
-    # Mount a directory (note the fields you need to fill)
+    # Mount a directory
 	go build main.go
-    ./main <workspace-token-service base url> <base url of commons> <path to manifest file> <directory to mount>
+    ./main  <path to config yaml file> <path to manifest json file> <directory to mount>
+
+Note the usage of the program above. You provide the yaml configuration file on the command line. In the repo, there are example yaml configs already completed.
+For a Kubernetes deployment into a Jupyter pod, config.yaml may be appropriate. To run Gen3Fuse on your own computer, local-config.yaml might be useful.
     
 To safely unmount Gen3Fuse for any reason:
     
     umount -f <mounted directory>
 
-## Running tests and mocking the Workspace Token Service
+Note that Gen3Fuse will make an Unmount call on the mount point provided to it before it mounts the directory. 
+
+## Running unit tests and mocking the Workspace Token Service
 
 If you want to test this program locally, you can use the resources in the tests/ folder to mock the Workspace Token Service.
 
@@ -71,9 +76,19 @@ Then, in one terminal window, run:
     go build tests/mock_wts_server.go
     ./mock_wts_server <commons url> <api key>
 
-The mock workspace token service should now be running at localhost:8001.
+The mock workspace token service should now be running at localhost:8001. The yaml file you pass in should set this as the Workspace Token Service base url (local-config.yaml is set up to work with this pattern).
 
 If you've already performed the Gen3Fuse setup instructions listed above, you can just run the following in a separate window:
 
     go test tests/gen3fuse_test.go
+
+## Running performance tests
+
+More info coming soon!
+
+
+
+
+
+
 

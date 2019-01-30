@@ -1,5 +1,0 @@
-FencePath: /user
-FencePresignedURLPath: /data/download/%s
-WTSFenceConnectPath: /oauth2/authorization_url
-WTSAccessTokenPath: /token?expires=%d
-LogFilePath: ./fuse_log.txt

@@ -7,21 +7,33 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 5 {
-		fmt.Fprintf(
-			os.Stderr,
-			"Error: %s incorrect number of args. \nUsage: ./main  <workspace-token-service base url> <base url of commons> <path to manifest file> <directory to mount>\n",
-			"gen3fuse")
+	if len(os.Args) != 4 {
+		fmt.Fprintf(os.Stderr, "Error: incorrect number of args. \nUsage: ./main  <path to config yaml file> <path to manifest json file> <directory to mount>\n")
 		os.Exit(1)
 	}
 
+	configFileName := os.Args[1]	
+	manifestFilePath := os.Args[2]
+	mountPoint := os.Args[3]
+
+	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "The config yaml file argument provided at %s does not exist. Exiting Gen3Fuse.\n", configFileName)
+			os.Exit(1)
+		}
+	}
+
+	gen3fuse.Unmount(mountPoint)
+
+	if _, err := os.Stat(manifestFilePath); os.IsNotExist(err) {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "The manifest file path provided at %s does not exist. Exiting Gen3Fuse.\n", manifestFilePath)
+			os.Exit(1)
+		}
+	}
+
 	var gen3FuseConfig gen3fuse.Gen3FuseConfig
-	gen3FuseConfig.GetGen3FuseConfigFromYaml("config.yaml")
+	gen3FuseConfig.GetGen3FuseConfigFromYaml(configFileName)
 
-	gen3FuseConfig.WTSBaseURL = os.Args[1]
-	gen3FuseConfig.Hostname = os.Args[2]
-	manifestURL := os.Args[3]
-	mountPoint := os.Args[4]
-
-	gen3fuse.InitializeApp(&gen3FuseConfig, manifestURL, mountPoint)
+	gen3fuse.InitializeApp(&gen3FuseConfig, manifestFilePath, mountPoint)
 }

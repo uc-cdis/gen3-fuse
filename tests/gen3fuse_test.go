@@ -31,19 +31,24 @@ func CreateDirIfNotExist(dir string) {
 	}
 }
 
+func RemoveDirIfExist(dir string) {
+	if _, err := os.Stat(dir); os.IsExist(err) {
+		err = os.Remove(dir)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
-	err := gen3FuseConfig.GetGen3FuseConfigFromYaml("default-config.yaml")
+	err := gen3FuseConfig.GetGen3FuseConfigFromYaml("../local-config.yaml")
 	if err != nil {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
 
-	gen3FuseConfig.WTSBaseURL = "http://localhost:8001"
-
-	gen3FuseConfig.Hostname = "https://zakir.planx-pla.net"
-
 	var testManifest = `[
 		{
-			"uuid": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
+			"object_id": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
 			"subject_id": "10"
 		}
 	]`
@@ -54,10 +59,7 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
 
 func TestEmptyManifest(t *testing.T) {
 	var gen3FuseConfig gen3fuse.Gen3FuseConfig
-	gen3FuseConfig.GetGen3FuseConfigFromYaml("default-config.yaml")
-	gen3FuseConfig.WTSBaseURL = "http://localhost:8001"
-
-	gen3FuseConfig.Hostname = "https://zakir.planx-pla.net"
+	gen3FuseConfig.GetGen3FuseConfigFromYaml("../local-config.yaml")
 
 	manifestBody1 := ""
 	WriteStringToFile("test-empty-manifest.json", manifestBody1)
@@ -211,14 +213,15 @@ func TestOpenFileNonexistent(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	// any setup actions go here
+	RemoveDirIfExist("test-mount-directory")
 	CreateDirIfNotExist("test-mount-directory")
 
 	retCode := m.Run()
 
-	os.Exit(retCode)
-
 	// teardown actions go here
-	os.Remove("default-config.yaml")
 	os.Remove("test-empty-manifest.json")
 	os.Remove("test-manifest.json")
+	os.Remove("test-mount-directory")
+
+	os.Exit(retCode)
 }

@@ -11,17 +11,20 @@ import (
 )
 
 type Gen3FuseConfig struct {
-	Hostname    string
 	LogFilePath string `yaml:"LogFilePath"`
 
 	// Workspace Token Service configuration
-	WTSBaseURL          string
+	WTSBaseURL          string `yaml:"WTSBaseURL"`
 	WTSFenceConnectPath string `yaml:"WTSFenceConnectPath"`
 	WTSAccessTokenPath  string `yaml:"WTSAccessTokenPath"`
 
 	// Fence configuration
-	FencePath             string `yaml:"FencePath"`
+	FenceBaseURL          string `yaml:"FenceBaseURL"`
 	FencePresignedURLPath string `yaml:"FencePresignedURLPath"`
+
+	// Indexd configuration
+	IndexdBaseURL          string `yaml:"IndexdBaseURL"`
+	IndexdBulkFileInfoPath string `yaml:"IndexdBulkFileInfoPath"`
 }
 
 func (gc *Gen3FuseConfig) GetGen3FuseConfigFromYaml(filename string) (err error) {
@@ -80,7 +83,7 @@ func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
 
 func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string) {
 	tokenLifetimeInSeconds := 3600
-	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL+gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
+	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
 
 	tokenResponse := new(tokenResponse)
 	getJson(requestUrl, tokenResponse)
