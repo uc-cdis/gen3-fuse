@@ -78,9 +78,9 @@ func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
 	return
 }
 
-func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (access_token string) {
-	token_lifetime_in_seconds := 3600
-	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL+gen3FuseConfig.WTSAccessTokenPath, token_lifetime_in_seconds)
+func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string) {
+	tokenLifetimeInSeconds := 3600
+	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL+gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
 
 	tokenResponse := new(tokenResponse)
 	getJson(requestUrl, tokenResponse)

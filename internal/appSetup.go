@@ -100,15 +100,13 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 			wg.Wait()
 			if waitedForSignal == syscall.SIGUSR1 {
 				return
-			} else {
-				return fuse.EINVAL
 			}
-		} else {
-			// kill our own waiting goroutine
-			kill(os.Getpid(), syscall.SIGUSR1)
-			wg.Wait()
-			defer daemonCtx.Release()
-		}
+			return fuse.EINVAL
+		} 
+		// kill our own waiting goroutine
+		kill(os.Getpid(), syscall.SIGUSR1)
+		wg.Wait()
+		defer daemonCtx.Release()
 
 		// Mount the file system.
 		var mfs *fuse.MountedFileSystem

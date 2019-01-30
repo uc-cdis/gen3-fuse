@@ -10,7 +10,7 @@ func main() {
 	if len(os.Args) != 5 {
 		fmt.Fprintf(
 			os.Stderr,
-			"Error: %s incorrect number of args. \nUsage: ./main <url-to-workspace-token-service> <commons-hostname> <path-to-manifest-file> <mount-point>\n",
+			"Error: %s incorrect number of args. \nUsage: ./main  <workspace-token-service base url> <base url of commons> <path to manifest file> <directory to mount>\n",
 			"gen3fuse")
 		os.Exit(1)
 	}

@@ -29,9 +29,9 @@ type Gen3Fuse struct {
 }
 
 type manifestRecord struct {
-	Object_Id  string
-	Subject_Id string
-	Uuid       string
+	ObjectId  string  `json:"object_id"`
+	SubjectId string  `json:"subject_id"`
+	Uuid       string  `json:"uuid"`
 }
 
 var LogFilePath string = "fuse_log.txt"
@@ -52,8 +52,8 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestUR
 		gen3FuseConfig: gen3FuseConfig,
 	}
 
-	var struct_str string = fmt.Sprintf("%#v", gen3FuseConfig)
-	FuseLog("\nLoaded Gen3FuseConfig: " + struct_str + "\n")
+	var structStr string = fmt.Sprintf("%#v", gen3FuseConfig)
+	FuseLog("\nLoaded Gen3FuseConfig: " + structStr + "\n")
 
 	b, err := ioutil.ReadFile(manifestURL)
 	if err != nil {
@@ -299,14 +299,13 @@ func (fs *Gen3Fuse) OpenFile(
 		presignedUrl, err := fs.GetPresignedURL(info.DID)
 		if err != nil {
 			return err
-		} else {
-			info.presignedUrl = presignedUrl
-			var fileBody string = FetchContentsAtURL(info.presignedUrl)
-			var fileSize = uint64(len(fileBody))
-			info.attributes.Size = fileSize
-			info.fileBody = fileBody
-			fs.inodes[op.Inode] = info
-		}
+		} 
+		info.presignedUrl = presignedUrl
+		var fileBody string = FetchContentsAtURL(info.presignedUrl)
+		var fileSize = uint64(len(fileBody))
+		info.attributes.Size = fileSize
+		info.fileBody = fileBody
+		fs.inodes[op.Inode] = info
 	}
 
 	fs.inodes[op.Inode] = info
@@ -392,10 +391,10 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	request_url := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePath+fs.gen3FuseConfig.FencePresignedURLPath, DID)
-	FuseLog("GET " + request_url)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePath+fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	FuseLog("GET " + requestUrl)
 
-	req, err := http.NewRequest("GET", request_url, nil)
+	req, err := http.NewRequest("GET", requestUrl, nil)
 	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
 
 	if err != nil {
@@ -412,7 +411,7 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 	return resp, nil
 }
 
-func FetchContentsAtURL(presignedUrl string) (string_data string) {
+func FetchContentsAtURL(presignedUrl string) (stringData string) {
 	FuseLog("\nGET " + presignedUrl)
 	resp, err := http.Get(presignedUrl)
 	if err != nil {

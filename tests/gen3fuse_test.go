@@ -1,4 +1,4 @@
-package gen3fuse_test
+package tests
 
 import (
 	"context"
@@ -8,15 +8,8 @@ import (
 	"testing"
 	"strings"
 
-	gen3fuse "gen3-fuse/api"
+	gen3fuse "gen3-fuse/internal"
 )
-
-var normalTestConfig = `FencePath: /user
-FencePresignedURLPath: /data/download/%%s
-WTSFenceConnectPath: /oauth2/authorization_url
-WTSAccessTokenPath: /token?expires=%%d
-LogFilePath: ./fuse_log.txt
-`
 
 func WriteStringToFile(filename string, filebody string) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -39,8 +32,7 @@ func CreateDirIfNotExist(dir string) {
 }
 
 func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
-	WriteStringToFile("normal-config.yaml", normalTestConfig)
-	err := gen3FuseConfig.GetGen3FuseConfigFromYaml("normal-config.yaml")
+	err := gen3FuseConfig.GetGen3FuseConfigFromYaml("default-config.yaml")
 	if err != nil {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
@@ -62,8 +54,7 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
 
 func TestEmptyManifest(t *testing.T) {
 	var gen3FuseConfig gen3fuse.Gen3FuseConfig
-	WriteStringToFile("test-presigned-url-config.yaml", normalTestConfig)
-	gen3FuseConfig.GetGen3FuseConfigFromYaml("test-presigned-url-config.yaml")
+	gen3FuseConfig.GetGen3FuseConfigFromYaml("default-config.yaml")
 	gen3FuseConfig.WTSBaseURL = "http://localhost:8001"
 
 	gen3FuseConfig.Hostname = "https://zakir.planx-pla.net"
@@ -227,7 +218,7 @@ func TestMain(m *testing.M) {
 	os.Exit(retCode)
 
 	// teardown actions go here
-	os.Remove("normal-config.yaml")
+	os.Remove("default-config.yaml")
 	os.Remove("test-empty-manifest.json")
 	os.Remove("test-manifest.json")
 }
