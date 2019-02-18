@@ -8,6 +8,7 @@ import (
 var (
 	ConnectWithFence = internal.ConnectWithFence
 	NewGen3Fuse      = internal.NewGen3Fuse
+	NewGen3FuseConfigFromYaml = internal.NewGen3FuseConfigFromYaml
 	InitializeApp    = internal.InitializeApp
 	Mount            = internal.Mount
 	Unmount          = internal.Unmount

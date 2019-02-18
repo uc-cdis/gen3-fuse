@@ -52,7 +52,10 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		return nil, err
 	}
 
-	accessToken := GetAccessToken(gen3FuseConfig)
+	accessToken, err := GetAccessToken(gen3FuseConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	fs = &Gen3Fuse{
 		accessToken:    accessToken,
@@ -387,7 +390,10 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*indexdResp
 	} else if resp.StatusCode == 401 {
 		// get a new access token, try again just one more time
 		FuseLog("Got 401, retrying...")
-		fs.accessToken = GetAccessToken(fs.gen3FuseConfig)
+		fs.accessToken, err = GetAccessToken(fs.gen3FuseConfig)
+		if err != nil {
+			return nil, err
+		}
 		respRetry, err := fs.FetchBulkSizeResponseFromIndexd()
 		if err != nil {
 			return nil, err
@@ -416,7 +422,10 @@ func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error)
 	} else if resp.StatusCode == 401 {
 		// get a new access token, try again just one more time
 		FuseLog("Got 401, retrying...")
-		fs.accessToken = GetAccessToken(fs.gen3FuseConfig)
+		fs.accessToken, err = GetAccessToken(fs.gen3FuseConfig)
+		if err != nil {
+			return "", err
+		}
 		respRetry, err := fs.FetchURLResponseFromFence(DID)
 		if err != nil {
 			return "", err

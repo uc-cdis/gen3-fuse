@@ -40,8 +40,8 @@ func RemoveDirIfExist(dir string) {
 	}
 }
 
-func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
-	err := gen3FuseConfig.GetGen3FuseConfigFromYaml("../local-config.yaml")
+func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
+	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml("../local-config.yaml")
 	if err != nil {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
@@ -58,15 +58,14 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig gen3fuse.Gen3FuseConfig) {
 }
 
 func TestEmptyManifest(t *testing.T) {
-	var gen3FuseConfig gen3fuse.Gen3FuseConfig
-	gen3FuseConfig.GetGen3FuseConfigFromYaml("../local-config.yaml")
+	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml("../local-config.yaml")
 
 	manifestBody1 := ""
 	WriteStringToFile("test-empty-manifest.json", manifestBody1)
 
 	ctx := context.Background()
 
-	_, _, err := gen3fuse.Mount(ctx, "test-mount-directory/", &gen3FuseConfig, "test-empty-manifest.json")
+	_, _, err = gen3fuse.Mount(ctx, "test-mount-directory/", gen3FuseConfig, "test-empty-manifest.json")
 	defer gen3fuse.Unmount("test-mount-directory/")
 	if err != nil {
 		t.Errorf("Error mounting: " + err.Error())
@@ -102,7 +101,7 @@ func TestGetPresignedURL(t *testing.T) {
 	gen3FuseConfig := SetUpTestData(t)
 
 	ctx := context.Background()
-	g3fs, err := gen3fuse.NewGen3Fuse(ctx, &gen3FuseConfig, "test-manifest.json")
+	g3fs, err := gen3fuse.NewGen3Fuse(ctx, gen3FuseConfig, "test-manifest.json")
 
 	if g3fs == nil {
 		t.Errorf(err.Error())
@@ -129,7 +128,7 @@ func TestReadFile(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, _, err := gen3fuse.Mount(ctx, "test-mount-directory/", &gen3FuseConfig, "test-manifest.json")
+	_, _, err := gen3fuse.Mount(ctx, "test-mount-directory/", gen3FuseConfig, "test-manifest.json")
 	defer gen3fuse.Unmount("test-mount-directory/")
 	if err != nil {
 		t.Errorf("Error mounting: " + err.Error())
@@ -182,7 +181,7 @@ func TestOpenFileNonexistent(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, _, err := gen3fuse.Mount(ctx, "test-mount-directory/", &gen3FuseConfig, "test-manifest.json")
+	_, _, err := gen3fuse.Mount(ctx, "test-mount-directory/", gen3FuseConfig, "test-manifest.json")
 	defer gen3fuse.Unmount("test-mount-directory/")
 	if err != nil {
 		t.Errorf("Error mounting: " + err.Error())

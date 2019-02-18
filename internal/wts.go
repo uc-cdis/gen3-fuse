@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"strconv"
 )
 
 type Gen3FuseConfig struct {
@@ -27,20 +28,20 @@ type Gen3FuseConfig struct {
 	IndexdBulkFileInfoPath string `yaml:"IndexdBulkFileInfoPath"`
 }
 
-func (gc *Gen3FuseConfig) GetGen3FuseConfigFromYaml(filename string) (err error) {
+func NewGen3FuseConfigFromYaml(filename string) (gen3FuseConfig *Gen3FuseConfig, err error) {
 	yamlFile, err := ioutil.ReadFile(filename)
 	if err != nil || yamlFile == nil {
 		FuseLog("yamlFile.Get err: " + err.Error())
-		return err
+		return nil, err
 	}
 
-	err = yaml.Unmarshal(yamlFile, gc)
+	err = yaml.Unmarshal(yamlFile, &gen3FuseConfig)
 	if err != nil {
 		FuseLog("Unmarshal: " + err.Error())
-		return err
+		return nil, err
 	}
 
-	return nil
+	return gen3FuseConfig, nil
 }
 
 type fenceConnectResponse struct {
@@ -54,21 +55,33 @@ type tokenResponse struct {
 
 var myClient = &http.Client{Timeout: 10 * time.Second}
 
-func getJson(url string, target interface{}) error {
+func getJson(url string, target interface{}) (err error, ok bool) {
 	r, err := myClient.Get(url)
 	if err != nil {
-		return err
+		return err, false
 	}
 	defer r.Body.Close()
 
-	return json.NewDecoder(r.Body).Decode(target)
+	if r.StatusCode != 200 { 
+		return errors.New(strconv.Itoa(r.StatusCode)), false
+	}
+
+	err = json.NewDecoder(r.Body).Decode(target)
+	if err != nil {
+		return err, false
+	}
+
+	return nil, true
 }
 
 func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
 	requestUrl := gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSFenceConnectPath
 	fenceResponse := new(fenceConnectResponse)
 
-	getJson(requestUrl, fenceResponse)
+	err, ok := getJson(requestUrl, fenceResponse)
+	if err != nil || !ok {
+		return err
+	}
 
 	if fenceResponse.Success != "connected with fence" {
 		FuseLog("Error connecting with fence via the workspace token service at " + requestUrl)
@@ -81,18 +94,22 @@ func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
 	return
 }
 
-func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string) {
+func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
 	tokenLifetimeInSeconds := 3600
 	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
 
 	tokenResponse := new(tokenResponse)
-	getJson(requestUrl, tokenResponse)
+	err, ok := getJson(requestUrl, tokenResponse)
+	if err != nil || !ok {
+		return "", err
+	}
 
 	if len(tokenResponse.Token) == 0 {
 		fmt.Println("Error obtaining access token from the workspace token service at " + requestUrl)
-		fmt.Printf("WTS returned %s\n", tokenResponse)
-		return
+		wtsReturned := fmt.Sprintf("WTS returned %s\n", tokenResponse)
+		fmt.Printf(wtsReturned)
+		return "", errors.New("Error obtaining access token from the workspace token service at " + requestUrl + ". " + wtsReturned)
 	}
 
-	return tokenResponse.Token
+	return tokenResponse.Token, nil
 }

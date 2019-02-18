@@ -32,29 +32,17 @@ If you're a Mac user, you may need to install [OSXFUSE](https://github.com/osxfu
 Before running this program, you'll need the Workspace Token Service running at some URL, as Gen3Fuse uses that service to authenticate.
 If you'd prefer to mock this service for testing purposes, see the testing section below.
 
-You can choose where errors are logged in config.yaml. By default they are logged to ./fuse_log.txt. To setup and mount a directory:
+You can choose where errors are logged in the yaml config file. By default they are logged to /dev/stdout in production (config.yaml) and ./fuse_log.txt in development (local-config.yaml). To setup and mount a directory:
     
     # Clone
     git clone https://github.com/uc-cdis/gen3-fuse.git
     cd gen3-fuse/
 
-    # Switch to this branch
-    git checkout initial_fuse
+    # Build
+    ./build.sh
 
-    # Grab submodules
-    git submodule init
-    git submodule update
-    
-    # Install dependencies   
-    go get -u golang.org/x/crypto/ssh/terminal
-    go get -u golang.org/x/sys/unix
-    go get -u golang.org/x/net/context
-    go get -u gopkg.in/yaml.v2
-    go get -u github.com/gorilla/mux
-
-    # Mount a directory
-	go build main.go
-    ./main  <path to config yaml file> <path to manifest json file> <directory to mount>
+    # Run (note the fields you need to fill in)
+    ./gen3fuse  <path to config yaml file> <path to manifest json file> <directory to mount>
 
 Note the usage of the program above. You provide the yaml configuration file on the command line. In the repo, there are example yaml configs already completed.
 For a Kubernetes deployment into a Jupyter pod, config.yaml may be appropriate. To run Gen3Fuse on your own computer, local-config.yaml might be useful.

@@ -8,4 +8,4 @@ WTSBaseURL: "https://workspace-token-service"
 WTSFenceConnectPath: "/oauth2/authorization_url"
 WTSAccessTokenPath: "/token?expires=%d"
 
-LogFilePath: "./fuse_log.txt"
+LogFilePath: "/dev/stdout"

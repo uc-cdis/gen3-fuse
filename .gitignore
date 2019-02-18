@@ -2,6 +2,7 @@
 mountpt
 mountpt/*
 main
+gen3fuse
 fuse_log.txt
 tests/get_me_a_token.py
 tests/fuse_log.txt

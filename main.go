@@ -32,8 +32,12 @@ func main() {
 		}
 	}
 
-	var gen3FuseConfig gen3fuse.Gen3FuseConfig
-	gen3FuseConfig.GetGen3FuseConfigFromYaml(configFileName)
+	// var gen3FuseConfig gen3fuse.Gen3FuseConfig
+	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml(configFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing yaml from %s: %s\n", configFileName, err.Error())
+		os.Exit(1)
+	}
 
-	gen3fuse.InitializeApp(&gen3FuseConfig, manifestFilePath, mountPoint)
+	gen3fuse.InitializeApp(gen3FuseConfig, manifestFilePath, mountPoint)
 }
