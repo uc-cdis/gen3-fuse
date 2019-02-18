@@ -1,0 +1,11 @@
+FenceBaseURL: "https://zakir.planx-pla.net/user"
+FencePresignedURLPath: "/data/download/%s"
+
+IndexdBaseURL: "https://zakir.planx-pla.net/index"
+IndexdBulkFileInfoPath: "/bulk/documents"
+
+WTSBaseURL: "http://localhost:8001"
+WTSFenceConnectPath: "/oauth2/authorization_url"
+WTSAccessTokenPath: "/token?expires=%d"
+
+LogFilePath: "./fuse_log.txt"

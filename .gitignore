@@ -1,0 +1,15 @@
+**/.DS_Store
+mountpt
+mountpt/*
+main
+gen3fuse
+fuse_log.txt
+tests/get_me_a_token.py
+tests/fuse_log.txt
+tests/normal-config.yaml
+tests/test-manifest.json
+tests/test-empty-manifest.json
+tests/test-presigned-url-manifest.json
+tests/test-presigned-url-config.yaml
+tests/test-mount-directory
+test-data/
