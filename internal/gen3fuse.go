@@ -354,8 +354,6 @@ func (fs *Gen3Fuse) ReadFile(
 
 	if err != nil {
 		FuseLog("Error reading file: " + err.Error())
-		return err
-
 	}
 
 	// Special case: FUSE doesn't expect us to return io.EOF.
