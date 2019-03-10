@@ -349,8 +349,13 @@ func (fs *Gen3Fuse) ReadFile(
 
 	// op.Offset: The offset within the file at which to read.
 	// op.Dst: The destination buffer, whose length gives the size of the read.
+
 	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
 	FuseLog(string(op.Dst))
+	FuseLog(strconv.Itoa(op.BytesRead))
+	if op.BytesRead > 0 {
+		return nil
+	}
 
 	if err != nil {
 		FuseLog("Error reading file: " + err.Error())
