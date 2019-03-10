@@ -1,11 +1,10 @@
-FenceBaseURL: "https://zakir.planx-pla.net/user"
-FencePresignedURLPath: "/data/download/%s"
+FencePresignedURLPath: "/user/data/download/%s"
+FenceAccessTokenPath: "/user/credentials/api/access_token"
 
-IndexdBaseURL: "https://zakir.planx-pla.net/index"
-IndexdBulkFileInfoPath: "/bulk/documents"
+IndexdBulkFileInfoPath: "/index/bulk/documents"
 
 WTSBaseURL: "http://localhost:8001"
 WTSFenceConnectPath: "/oauth2/authorization_url"
 WTSAccessTokenPath: "/token?expires=%d"
 
-LogFilePath: "./fuse_log.txt"
+LogFilePath: "fuse_log.txt"

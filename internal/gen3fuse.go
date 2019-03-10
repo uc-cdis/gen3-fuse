@@ -47,11 +47,6 @@ var LogFilePath string = "fuse_log.txt"
 func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFilePath string) (fs *Gen3Fuse, err error) {
 	LogFilePath = gen3FuseConfig.LogFilePath
 
-	err = ConnectWithFence(gen3FuseConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	accessToken, err := GetAccessToken(gen3FuseConfig)
 	if err != nil {
 		return nil, err
@@ -78,9 +73,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 
 		var structStr string = fmt.Sprintf("%#v", didToFileInfo)
 		FuseLog("\n Indexd response: " + structStr + "\n")
-	}
-
-	
+	}	
 
 	fs.inodes = InitializeInodes(didToFileInfo)
 
@@ -406,7 +399,7 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*indexdResp
 		}
 	}
 
-	return nil, fs.HandleFenceError(resp)
+	return nil, fs.HandleIndexdError(resp)
 }
 
 func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
@@ -468,11 +461,11 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.FenceBaseURL + fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.FencePresignedURLPath, DID)
 	FuseLog("GET " + requestUrl)
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
-	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
+	req.Header.Add("Authorization", "Bearer "+ fs.accessToken)
 	req.Header.Add("Accept", "application/json")
 
 	if err != nil {
@@ -500,7 +493,7 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 }
 
 func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err error) {
-	requestUrl := fs.gen3FuseConfig.IndexdBaseURL + fs.gen3FuseConfig.IndexdBulkFileInfoPath
+	requestUrl := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
 	
 	var DIDsWithQuotes []string
 	for _, x := range fs.DIDs {

@@ -7,9 +7,12 @@ import (
 	"os"
 	"testing"
 	"strings"
+	"flag"
 
 	gen3fuse "gen3-fuse/internal"
 )
+
+var hostnameFlag = flag.String("hostname", "", "Hostname of commons to run tests against")
 
 func WriteStringToFile(filename string, filebody string) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -46,6 +49,8 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
 
+	
+	gen3FuseConfig.Hostname = *hostnameFlag
 	var testManifest = `[
 		{
 			"object_id": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
