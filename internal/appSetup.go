@@ -76,7 +76,7 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Your exported files have been mounted to %s.\n", mountPoint)
+	fmt.Fprintf(os.Stderr, "Your exported files have been mounted to %s/exported_files.\n", mountPoint)
 
 	return
 }
