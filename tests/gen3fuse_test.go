@@ -7,9 +7,13 @@ import (
 	"os"
 	"testing"
 	"strings"
+	"flag"
 
 	gen3fuse "gen3-fuse/internal"
 )
+
+var hostnameFlag = flag.String("hostname", "", "Hostname of commons to run tests against")
+var wtsURLFlag = flag.String("wtsURL", "", "Hostname of workspace token service to run tests against")
 
 func WriteStringToFile(filename string, filebody string) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -45,6 +49,10 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 	if err != nil {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
+	
+
+	gen3FuseConfig.Hostname = *hostnameFlag
+	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 
 	var testManifest = `[
 		{
@@ -59,7 +67,9 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 
 func TestEmptyManifest(t *testing.T) {
 	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml("../local-config.yaml")
-
+	
+	gen3FuseConfig.Hostname = *hostnameFlag
+	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 	manifestBody1 := ""
 	WriteStringToFile("test-empty-manifest.json", manifestBody1)
 
@@ -206,6 +216,38 @@ func TestOpenFileNonexistent(t *testing.T) {
 	// error should contain "no such file or directory"
 	if err == nil || !strings.Contains(err.Error(), "no such file or directory") {
 		t.Errorf("Was expecting error to contain <no such file or directory>")
+		return
+	}
+}
+
+func TestInitializeInodesNoFilenameButURLProvided(t *testing.T) {
+	// Test the case where Indexd does not provide a filename but it does provide at least 1 URL
+	didToFileInfo := make(map[string]*gen3fuse.IndexdResponse, 0)
+	didToFileInfo["did-1"] = &gen3fuse.IndexdResponse{ 
+		Filesize : 1000, 
+		Filename: "",
+		DID: "did-1",
+		URLs: []string{"s3://some-s3-bucket/s3test4.txt"},
+	}
+	
+	result := gen3fuse.InitializeInodes(didToFileInfo)
+	
+	var structStr string = fmt.Sprintf("%+v", result)
+	fmt.Println("\n InitInodes result: " + structStr + "\n")
+
+	if result[1].Children[0].Name != "exported_files" {
+		t.Errorf("Root directory name is incorrect. Expected exported_files, Got %s", result[1].Children[0].Name)
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Length of InitializeInodes result is incorrect. Expected 3, Got %d", len(result))
+	}
+
+	expectedFileName := "s3test4.txt"
+	DirInode := result[1].Children[0].Inode
+	resultFileName := result[DirInode].Children[0].Name
+	if expectedFileName != resultFileName {
+		t.Errorf("Inode filename incorrect. Expected %s got %s", expectedFileName, resultFileName)
 		return
 	}
 }

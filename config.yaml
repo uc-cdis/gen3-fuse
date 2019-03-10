@@ -1,11 +1,9 @@
-FenceBaseURL: "https://fence-service"
-FencePresignedURLPath: "/data/download/%s"
+FencePresignedURLPath: "/user/data/download/%s"
+FenceAccessTokenPath: "/user/credentials/api/access_token"
 
-IndexdBaseURL: "https://indexd-service"
-IndexdBulkFileInfoPath: "/bulk/documents"
+IndexdBulkFileInfoPath: "/index/bulk/documents"
 
-WTSBaseURL: "https://workspace-token-service"
 WTSFenceConnectPath: "/oauth2/authorization_url"
 WTSAccessTokenPath: "/token?expires=%d"
 
-LogFilePath: "/dev/stdout"
+LogFilePath: "fuse_log.txt"
