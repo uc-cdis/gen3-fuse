@@ -1,0 +1,2 @@
+this file lives in s3://devplanetv1-proj1-databucket-gen3 bucket, with corresponding records 
+in the index_record, index_record_url, index_record_url_metadata, index_record_metadata, and index_record_ace tables
