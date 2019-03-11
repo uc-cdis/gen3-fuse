@@ -13,3 +13,4 @@ tests/test-presigned-url-manifest.json
 tests/test-presigned-url-config.yaml
 tests/test-mount-directory
 test-data/
+exported_files/
