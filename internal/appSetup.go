@@ -49,9 +49,13 @@ func kill(pid int, s os.Signal) (err error) {
 
 func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfig, manifestURL string) (fs *Gen3Fuse, mfs *fuse.MountedFileSystem, err error) {
 	fs, err = NewGen3Fuse(ctx, gen3FuseConfig, manifestURL)
+	if err != nil {
+		return
+	}
+
 	if fs == nil {
 		err = fmt.Errorf("Mount: initialization failed")
-		return
+		return 
 	}
 	server := fuseutil.NewFileSystemServer(fs)
 
@@ -64,9 +68,15 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
+		return
+	}
+
+	if mfs == nil {
 		err = fmt.Errorf("Mount: %v", err)
 		return
 	}
+
+	FuseLog(fmt.Sprintf("Your exported files have been mounted to %s/exported_files.\n", mountPoint))
 
 	return
 }
@@ -133,7 +143,8 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 	err := app.Run(os.Args)
 
 	if err != nil {
-		fmt.Println("Unable to mount file system, see syslog and " + gen3FuseConfig.LogFilePath + " for details")
+		FuseLog(err.Error())
+		fmt.Println("Unable to mount file system: " + err.Error() + "\n See " + gen3FuseConfig.LogFilePath + " for more details. ")
 		os.Exit(1)
 	}
 }
