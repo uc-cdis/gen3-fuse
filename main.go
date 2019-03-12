@@ -7,8 +7,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 5 {
-		fmt.Fprintf(os.Stderr, "Error: incorrect number of args. \nUsage: gen3fuse  <path to config yaml file> <path to manifest json file> <directory to mount> <hostname> [<api key>]\n")
+	if len(os.Args) < 6 {
+		fmt.Fprintf(os.Stderr, "Error: incorrect number of args. \nUsage: gen3fuse  <path to config yaml file> <path to manifest json file> <directory to mount> <hostname> <workspace token service url> [<api key>]\n")
 		os.Exit(1)
 	}
 
@@ -16,9 +16,10 @@ func main() {
 	manifestFilePath := os.Args[2]
 	mountPoint := os.Args[3]
 	hostname := os.Args[4]
+	wtsURL := os.Args[5]
 	apiKey := ""
-	if len(os.Args) == 6 { 
-		apiKey = os.Args[5]
+	if len(os.Args) == 7 { 
+		apiKey = os.Args[6]
 	}
 
 	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
@@ -47,6 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 	gen3FuseConfig.Hostname = hostname
+	gen3FuseConfig.WTSBaseURL = wtsURL
 	gen3FuseConfig.ApiKey = apiKey
 
 	gen3fuse.InitializeApp(gen3FuseConfig, manifestFilePath, mountPoint)

@@ -3,7 +3,6 @@ FenceAccessTokenPath: "/user/credentials/api/access_token"
 
 IndexdBulkFileInfoPath: "/index/bulk/documents"
 
-WTSBaseURL: "http://localhost:8001"
 WTSFenceConnectPath: "/oauth2/authorization_url"
 WTSAccessTokenPath: "/token?expires=%d"
 
