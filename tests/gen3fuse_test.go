@@ -13,6 +13,7 @@ import (
 )
 
 var hostnameFlag = flag.String("hostname", "", "Hostname of commons to run tests against")
+var wtsURLFlag = flag.String("wtsURL", "", "Hostname of workspace token service to run tests against")
 
 func WriteStringToFile(filename string, filebody string) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -49,8 +50,9 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
 
-	
 	gen3FuseConfig.Hostname = *hostnameFlag
+	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
+
 	var testManifest = `[
 		{
 			"object_id": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
@@ -64,7 +66,9 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 
 func TestEmptyManifest(t *testing.T) {
 	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml("../local-config.yaml")
-
+	
+	gen3FuseConfig.Hostname = *hostnameFlag
+	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 	manifestBody1 := ""
 	WriteStringToFile("test-empty-manifest.json", manifestBody1)
 
