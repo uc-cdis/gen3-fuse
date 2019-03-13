@@ -271,7 +271,7 @@ func (fs *Gen3Fuse) OpenDir(
 func (fs *Gen3Fuse) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-	//FuseLog("Inside ReadDir")
+	FuseLog("Inside ReadDir")
 	// Find the info for this inode.
 	info, ok := fs.inodes[op.Inode]
 	if !ok {
@@ -289,6 +289,8 @@ func (fs *Gen3Fuse) ReadDir(
 	}
 
 	entries := info.children
+	var structStrEntries string = fmt.Sprintf("%#v", entries)
+	FuseLog("\n Entries in directory in info.children are: " + structStrEntries + "\n")
 
 	// Grab the range of interest.
 	if op.Offset > fuseops.DirOffset(len(entries)) {
@@ -308,7 +310,7 @@ func (fs *Gen3Fuse) ReadDir(
 
 		op.BytesRead += n
 	}
-	//FuseLog("ReadDir function was successful")
+	FuseLog("ReadDir function was successful")
 	return
 }
 
