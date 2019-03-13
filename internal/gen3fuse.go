@@ -132,8 +132,13 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 	
 	k := 0
 	for did, fileInfo := range didToFileInfo {
-		var filename = fileInfo.Filename  // TODO: Determine whether the true filename is preferable, or just the DID
-
+		if fileInfo.Filename == "" {
+			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
+			continue
+		}
+		
+		var filename = fileInfo.Filename
+		
 		var dirEntry = fuseutil.Dirent{
 			Offset: fuseops.DirOffset(k + 1),
 			Inode:  inodeID,
@@ -173,7 +178,6 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 func findChildInode(
 	name string,
 	children []fuseutil.Dirent) (inode fuseops.InodeID, err error) {
-	//FuseLog("Inside findChildInode")
 	for _, e := range children {
 		if e.Name == name {
 			inode = e.Inode
@@ -211,14 +215,12 @@ func (fs *Gen3Fuse) patchAttributes(attr *fuseops.InodeAttributes) {
 func (fs *Gen3Fuse) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
-	//FuseLog("Inside StatFS")
 	return
 }
 
 func (fs *Gen3Fuse) LookUpInode(
 	ctx context.Context,
 	op *fuseops.LookUpInodeOp) (err error) {
-	// FuseLog("Inside LookUpInode")
 	// Find the info for the parent.
 	parentInfo, ok := fs.inodes[op.Parent]
 	if !ok {
@@ -263,7 +265,6 @@ func (fs *Gen3Fuse) GetInodeAttributes(
 func (fs *Gen3Fuse) OpenDir(
 	ctx context.Context,
 	op *fuseops.OpenDirOp) (err error) {
-	//FuseLog("Inside OpenDir")
 	// Allow opening any directory.
 	return
 }
@@ -271,7 +272,6 @@ func (fs *Gen3Fuse) OpenDir(
 func (fs *Gen3Fuse) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-	FuseLog("Inside ReadDir")
 	// Find the info for this inode.
 	info, ok := fs.inodes[op.Inode]
 	if !ok {
@@ -289,8 +289,6 @@ func (fs *Gen3Fuse) ReadDir(
 	}
 
 	entries := info.children
-	var structStrEntries string = fmt.Sprintf("%#v", entries)
-	FuseLog("\n Entries in directory in info.children are: " + structStrEntries + "\n")
 
 	// Grab the range of interest.
 	if op.Offset > fuseops.DirOffset(len(entries)) {
@@ -310,7 +308,6 @@ func (fs *Gen3Fuse) ReadDir(
 
 		op.BytesRead += n
 	}
-	FuseLog("ReadDir function was successful")
 	return
 }
 
