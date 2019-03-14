@@ -76,7 +76,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 	}	
 
 	fs.inodes = InitializeInodes(didToFileInfo)
-
+	FuseLog("Initialized inodes")
 	return fs, nil
 }
 
@@ -102,7 +102,7 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
-
+	FuseLog("Inside InitializeInodes")
 	const (
 		rootInode fuseops.InodeID = fuseops.RootInodeID + iota
 		exportedFilesInode
@@ -132,8 +132,13 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 	
 	k := 0
 	for did, fileInfo := range didToFileInfo {
-		var filename = fileInfo.Filename  // TODO: Determine whether the true filename is preferable, or just the DID
-
+		if fileInfo.Filename == "" {
+			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
+			continue
+		}
+		
+		var filename = fileInfo.Filename
+		
 		var dirEntry = fuseutil.Dirent{
 			Offset: fuseops.DirOffset(k + 1),
 			Inode:  inodeID,
@@ -154,6 +159,7 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 
 		inodeID += 1
 		k += 1
+		FuseLog("Added an inode entry to exported_files/")
 	}
 
 	// inode for directory that contains the imaginary files described in the manifest
@@ -172,7 +178,6 @@ func InitializeInodes(didToFileInfo map[string]*indexdResponse) map[fuseops.Inod
 func findChildInode(
 	name string,
 	children []fuseutil.Dirent) (inode fuseops.InodeID, err error) {
-
 	for _, e := range children {
 		if e.Name == name {
 			inode = e.Inode
@@ -185,6 +190,7 @@ func findChildInode(
 }
 
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
+	FuseLog("Inside LoadDIDsFromManifest")
 	b, err := ioutil.ReadFile(manifestFilePath)
 	if err != nil {
 		return err
@@ -266,15 +272,18 @@ func (fs *Gen3Fuse) OpenDir(
 func (fs *Gen3Fuse) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) (err error) {
-
 	// Find the info for this inode.
 	info, ok := fs.inodes[op.Inode]
 	if !ok {
+		FuseLog("Error: fs.inodes[op.Inode] returned not ok")
 		err = fuse.ENOENT
 		return
 	}
-
+	
 	if !info.dir {
+		FuseLog("Error: info.dir is not set true. So we can't read the directory.")
+		var structStr string = fmt.Sprintf("%#v", info)
+		FuseLog("\n ReadDir info struct was: " + structStr + "\n")
 		err = fuse.EIO
 		return
 	}
@@ -283,6 +292,7 @@ func (fs *Gen3Fuse) ReadDir(
 
 	// Grab the range of interest.
 	if op.Offset > fuseops.DirOffset(len(entries)) {
+		FuseLog("Error: (op.Offset > fuseops.DirOffset(len(entries)) was false")
 		err = fuse.EIO
 		return
 	}
@@ -298,7 +308,6 @@ func (fs *Gen3Fuse) ReadDir(
 
 		op.BytesRead += n
 	}
-
 	return
 }
 
@@ -330,7 +339,7 @@ func (fs *Gen3Fuse) OpenFile(
 func (fs *Gen3Fuse) ReadFile(
 	ctx context.Context,
 	op *fuseops.ReadFileOp) (err error) {
-
+	FuseLog("Inside ReadFile")
 	info, ok := fs.inodes[op.Inode]
 	if !ok {
 		err = fuse.ENOENT
@@ -406,6 +415,7 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*indexdResp
 }
 
 func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
+	FuseLog("Inside GetPresignedURL")
 	resp, err := fs.FetchURLResponseFromFence(DID)
 	if err != nil {
 		return "", err
