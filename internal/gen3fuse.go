@@ -117,7 +117,7 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
-
+	FuseLog("Inside InitializeInodes")
 	const (
 		rootInode fuseops.InodeID = fuseops.RootInodeID + iota
 		exportedFilesInode
@@ -165,7 +165,7 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
 			continue
 		}
-		
+
 		var dirEntry = fuseutil.Dirent{
 			Offset: fuseops.DirOffset(k + 1),
 			Inode:  inodeID,

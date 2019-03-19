@@ -54,6 +54,9 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 	gen3FuseConfig.Hostname = *hostnameFlag
 	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 
+	gen3FuseConfig.Hostname = *hostnameFlag
+	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
+
 	var testManifest = `[
 		{
 			"object_id": "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
