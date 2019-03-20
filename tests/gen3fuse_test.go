@@ -219,6 +219,38 @@ func TestOpenFileNonexistent(t *testing.T) {
 	}
 }
 
+func TestInitializeInodesNoFilenameButURLProvided(t *testing.T) {
+	// Test the case where Indexd does not provide a filename but it does provide at least 1 URL
+	didToFileInfo := make(map[string]*gen3fuse.IndexdResponse, 0)
+	didToFileInfo["did-1"] = &gen3fuse.IndexdResponse{ 
+		Filesize : 1000, 
+		Filename: "",
+		DID: "did-1",
+		URLs: []string{"s3://some-s3-bucket/s3test4.txt"},
+	}
+	
+	result := gen3fuse.InitializeInodes(didToFileInfo)
+	
+	var structStr string = fmt.Sprintf("%+v", result)
+	fmt.Println("\n InitInodes result: " + structStr + "\n")
+
+	if result[1].Children[0].Name != "exported_files" {
+		t.Errorf("Root directory name is incorrect. Expected exported_files, Got %s", result[1].Children[0].Name)
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Length of InitializeInodes result is incorrect. Expected 3, Got %d", len(result))
+	}
+
+	expectedFileName := "s3test4.txt"
+	DirInode := result[1].Children[0].Inode
+	resultFileName := result[DirInode].Children[0].Name
+	if expectedFileName != resultFileName {
+		t.Errorf("Inode filename incorrect. Expected %s got %s", expectedFileName, resultFileName)
+		return
+	}
+}
+
 func TestMain(m *testing.M) {
 	// any setup actions go here
 	RemoveDirIfExist("test-mount-directory")

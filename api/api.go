@@ -17,4 +17,5 @@ var (
 type (
 	Gen3Fuse       = internal.Gen3Fuse
 	Gen3FuseConfig = internal.Gen3FuseConfig
+	IndexdResponse = internal.IndexdResponse
 )
