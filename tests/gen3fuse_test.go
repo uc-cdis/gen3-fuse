@@ -49,10 +49,6 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 	if err != nil {
 		t.Errorf("Error parsing config from yaml: " + err.Error())
 	}
-	
-
-	gen3FuseConfig.Hostname = *hostnameFlag
-	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 
 	gen3FuseConfig.Hostname = *hostnameFlag
 	gen3FuseConfig.WTSBaseURL = *wtsURLFlag

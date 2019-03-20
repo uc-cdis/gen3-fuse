@@ -149,7 +149,7 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 	for did, fileInfo := range didToFileInfo {
 		filename := fileInfo.Filename
 
-		if fileInfo.Filename == "" && len(fileInfo.URLs) > 0 {
+		if filename == "" && len(fileInfo.URLs) > 0 {
 			// Try to get the filename from the first URL
 			res, ok := getFileNameFromURL(fileInfo.URLs[0])
 			if ok {
