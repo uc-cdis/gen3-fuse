@@ -1,0 +1,43 @@
+-------- Testing with benchmark/various-file-sizes-manifest.json ---------
+Time to mount filesystem: 1.500
+Time to list 6 files: 0.009
+Time to cat 100mb.txt of size 100000000 bytes: 3607.849
+Time to cat 10mb.txt of size 10000000 bytes: 52.159
+Time to cat 1mb.txt of size 1000000 bytes: 1.946
+Time to cat 20mb.txt of size 20000000 bytes: 168.412
+Time to cat 50mb.txt of size 50000000 bytes: 1095.247
+Time to cat 70mb.txt of size 70000000 bytes: 2503.839
+Time to mount filesystem: 1.505
+Time to list 6 files: 0.012
+Time to cat 100mb.txt of size 100000000 bytes: 3568.078
+Time to cat 10mb.txt of size 10000000 bytes: 47.104
+Time to cat 1mb.txt of size 1000000 bytes: 2.613
+Time to cat 20mb.txt of size 20000000 bytes: 146.005
+Time to cat 50mb.txt of size 50000000 bytes: 784.401
+Time to cat 70mb.txt of size 70000000 bytes: 2292.834
+Time to mount filesystem: 1.483
+Time to list 6 files: 0.008
+Time to cat 100mb.txt of size 100000000 bytes: 3602.005
+Time to mount filesystem: 1.446
+Time to list 6 files: 0.012
+Time to cat 100mb.txt of size 100000000 bytes: 3413.032
+Time to cat 10mb.txt of size 10000000 bytes: 59.516
+Time to cat 1mb.txt of size 1000000 bytes: 2.789
+Time to cat 20mb.txt of size 20000000 bytes: 185.296
+Time to cat 50mb.txt of size 50000000 bytes: 782.453
+Time to cat 70mb.txt of size 70000000 bytes: 1950.384
+Time to mount filesystem: 1.510
+Time to list 6 files: 0.008
+Time to cat 100mb.txt of size 100000000 bytes: 3602.717
+Time to cat 10mb.txt of size 10000000 bytes: 56.278
+Time to cat 1mb.txt of size 1000000 bytes: 2.168
+Time to cat 20mb.txt of size 20000000 bytes: 193.610
+Time to cat 50mb.txt of size 50000000 bytes: 798.599
+Time to cat 70mb.txt of size 70000000 bytes: 2739.867
+Time to mount filesystem: 1.815
+Time to list 5 files: 0.041
+Time to cat 10mb.txt of size 10000000 bytes: 49.782
+Time to cat 1mb.txt of size 1000000 bytes: 1.938
+Time to cat 20mb.txt of size 20000000 bytes: 164.411
+Time to cat 50mb.txt of size 50000000 bytes: 871.482
+Time to cat 70mb.txt of size 70000000 bytes: 2025.164

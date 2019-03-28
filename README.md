@@ -70,13 +70,22 @@ If you've already performed the Gen3Fuse setup instructions listed above, you ca
 
     go test tests/gen3fuse_test.go
 
-## Running performance tests
+## Performance tests
+Below are the results of a set of performance tests. Each chosen x axis value was tested 5 times, the results are shown in the scatter.
 
-More info coming soon!
+Tests were run at an internet connection speed of 30.6 Mbps (3.825 MB/s) download, 2.07 Mbps (0.25875 MB/s) upload. 
+Performance can clearly be improved. A 100MB file should take 26 seconds to download at this throughput, but takes an hour to 
+cat or cp using FUSE. 
 
+The fuse logs show that a ReadFile call is performed more than once per cat operation; this may indicate 
+that files are re-requested when read times are long. Such a problem could be addressed with the addition of per-file mutex locks.
 
+Another bottleneck is the logic of the ReadFile function. We can improve performance by parallelizing byte read operations and exploring partial downloads for 
+the tail and head operations using the HTTP Range header. 
 
+<img src="./benchmark/results/cat_plot.png" alt="cat times by filesize" width="750"/>
 
+<img src="./benchmark/results/mount_plot.png" alt="mount times by number of files" width="750"/>
 
-
+<img src="./benchmark/results/ls_plot.png" alt="ls times by number of files" width="750"/>
 

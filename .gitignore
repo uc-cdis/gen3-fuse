@@ -14,3 +14,5 @@ tests/test-presigned-url-config.yaml
 tests/test-mount-directory
 test-data/
 exported_files/
+bench-times.txt
+performance-test-log.txt
