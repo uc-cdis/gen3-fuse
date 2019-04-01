@@ -73,8 +73,8 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 			return nil, err
 		}
 
-		var structStr string = fmt.Sprintf("%#v", didToFileInfo)
-		FuseLog("\n Indexd response: " + structStr + "\n")
+		//var structStr string = fmt.Sprintf("%#v", didToFileInfo)
+		//FuseLog("\n Indexd response: " + structStr + "\n")
 	}
 
 	fs.inodes = InitializeInodes(didToFileInfo)
@@ -186,8 +186,9 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 
 		inodeID += 1
 		k += 1
-		FuseLog("Added an inode entry to exported_files/")
 	}
+
+	FuseLog(fmt.Sprintf("Added %d inode entries to exported_files/", k))
 
 	// inode for directory that contains the imaginary files described in the manifest
 	inodes[exportedFilesInode] = inodeInfo{
@@ -342,7 +343,7 @@ func (fs *Gen3Fuse) OpenFile(
 	ctx context.Context,
 	op *fuseops.OpenFileOp) (err error) {
 
-	FuseLog("inside OpenFile")
+	// FuseLog("inside OpenFile")
 
 	info, ok := fs.inodes[op.Inode]
 	if !ok {
@@ -387,7 +388,7 @@ func (fs *Gen3Fuse) ReadFile(
 	// op.Dst: The destination buffer, whose length gives the size of the read.
 
 	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
-	FuseLog(string(op.Dst))
+	//FuseLog(string(op.Dst))
 	FuseLog(strconv.Itoa(op.BytesRead))
 	if op.BytesRead > 0 {
 		return nil
@@ -542,7 +543,13 @@ func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err 
 
 	postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
 
-	FuseLog("POST " + requestUrl + "\n" + postData)
+	FuseLog("POST " + requestUrl) // + "\n" + postData)
+
+	// Decent timeout because there might be lots of files to list
+	timeout := time.Duration(60 * time.Second)
+	client := http.Client{
+	    Timeout: timeout,
+	}
 
 	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer(  []byte(postData)   ))
 	req.Header.Add("Authorization", "Bearer "+ fs.accessToken)
@@ -552,7 +559,7 @@ func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err 
 		FuseLog(err.Error())
 		return nil, err
 	}
-	resp, err = myClient.Do(req)
+	resp, err = client.Do(req)
 
 	if err != nil {
 		FuseLog(err.Error())
@@ -566,7 +573,7 @@ func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileIn
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 
-	FuseLog("Indexd response: " + bodyString)
+	// FuseLog("Indexd response: " + bodyString)
 
 	didToFileInfoList := make([]IndexdResponse, 0)
 	json.Unmarshal([]byte(bodyString), &didToFileInfoList)
@@ -587,7 +594,14 @@ func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileIn
 func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
 	FuseLog("\nGET " + presignedUrl)
 
-	resp, err := http.Get(presignedUrl)
+	// Huge timeout because we're about to download a file
+	timeout := time.Duration(500 * time.Second)
+	client := http.Client{
+	    Timeout: timeout,
+	}
+	resp, err := client.Get(presignedUrl)
+	
+	// resp, err := http.Get(presignedUrl)
 	if err != nil {
 		FuseLog(err.Error())
 		return byteContents, err

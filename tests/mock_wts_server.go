@@ -53,6 +53,7 @@ func retrieveAccessTokenFromTestCommons(commonsUrl string, apiKey string) (acces
 
     bodyBytes, _ := ioutil.ReadAll(r.Body)
     bodyString := string(bodyBytes)
+    fmt.Println(bodyString)
 
     var target AccessTokenResponse
     json.Unmarshal([]byte(bodyString), &target)
