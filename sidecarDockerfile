@@ -1,6 +1,6 @@
 FROM alpine
 
-USER jovyan 1000
+RUN adduser jovyan -u 1000 -G root -D 
 
 RUN apk add --no-cache \
         ca-certificates
@@ -54,4 +54,5 @@ WORKDIR $GOPATH
 COPY sidecarDockerrun.sh /usr/local/gen3/sidecarDockerrun.sh
 COPY config.yaml /usr/local/gen3/config.yaml
 RUN mv $GOPATH/src/gen3-fuse/gen3fuse /usr/local/bin/gen3fuse
+USER jovyan
 CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
