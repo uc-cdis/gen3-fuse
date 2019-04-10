@@ -1,5 +1,7 @@
 FROM alpine
 
+USER jovyan 1000
+
 RUN apk add --no-cache \
         ca-certificates
 
