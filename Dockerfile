@@ -51,8 +51,8 @@ WORKDIR $GOPATH/src/gen3-fuse
 RUN git checkout fix/null-file-fix
 RUN sh build.sh
 WORKDIR $GOPATH
+COPY sidecarDockerrun.sh /usr/local/gen3/sidecarDockerrun.sh
+COPY config.yaml /usr/local/gen3/config.yaml
 RUN mv $GOPATH/src/gen3-fuse/gen3fuse /usr/local/bin/gen3fuse
 USER jovyan
-COPY config.yaml ~/
-COPY sidecarDockerrun.sh /usr/local/gen3/sidecarDockerrun.sh
 CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
