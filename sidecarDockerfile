@@ -1,51 +1,13 @@
-FROM alpine
+FROM golang:1.12-alpine
 
+# Install SSL certificates
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl
 RUN adduser jovyan -u 1000 -G users -D 
-
 RUN apk add --no-cache \
         ca-certificates
-
-# set up nsswitch.conf for Go's "netgo" implementation
-# - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
-# - docker run --rm debian:stretch grep '^hosts:' /etc/nsswitch.conf
-RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf
-
-RUN set -eux; \
-    apk add --no-cache --virtual .build-deps \
-        bash \
-        gcc \
-        musl-dev \
-        openssl \
-        go \
-        wget \
-    ; \
-    \
-    wget -O go.tgz "https://golang.org/dl/go1.12.src.tar.gz"; \
-    echo '09c43d3336743866f2985f566db0520b36f4992aea2b4b2fd9f52f17049e88f2 *go.tgz' | sha256sum -c -; \
-    tar -C /usr/local -xzf go.tgz; \
-    rm go.tgz; \
-    \
-    cd /usr/local/go/src; \
-    ./make.bash; \
-    \
-    rm -rf \
-        /usr/local/go/pkg/bootstrap \
-        /usr/local/go/pkg/obj \
-    ; \
-    apk del .build-deps; \
-    \
-    export PATH="/usr/local/go/bin:$PATH"; \
-    go version
-
-RUN mkdir /go
 ENV GOPATH /go
-ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
-RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
+#RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH/src
-RUN apk add git
-RUN apk add fuse
-RUN apk add jq
-RUN apk add curl
 RUN git clone https://github.com/uc-cdis/gen3-fuse.git
 WORKDIR $GOPATH/src/gen3-fuse
 RUN git checkout fix/null-file-fix
@@ -55,4 +17,4 @@ RUN mv $GOPATH/src/gen3-fuse/gen3fuse /usr/local/bin/gen3fuse
 USER jovyan
 COPY config.yaml /home/jovyan/fuse-config.yaml
 COPY sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
-CMD [ "/bin/sh", "/home/jovyan/sidecarDockerrun.sh"]
+CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
