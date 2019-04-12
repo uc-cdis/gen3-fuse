@@ -1,20 +1,12 @@
 FROM golang:1.12-alpine
 
-# Install SSL certificates
 RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl
 RUN adduser jovyan -u 1000 -G users -D 
-RUN apk add --no-cache \
-        ca-certificates
-ENV GOPATH /go
-#RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
-WORKDIR $GOPATH/src
-RUN git clone https://github.com/uc-cdis/gen3-fuse.git
-WORKDIR $GOPATH/src/gen3-fuse
-RUN git checkout fix/null-file-fix
-RUN sh build.sh
-WORKDIR $GOPATH
+ADD . $GOPATH/src/gen3-fuse
+WORKDIR $GOPATH/src/gen3-fuse/
+RUN sh ./build.sh
+RUN mv $GOPATH/src/gen3-fuse/config.yaml /home/jovyan/fuse-config.yaml
+RUN mv $GOPATH/src/gen3-fuse/sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
 RUN mv $GOPATH/src/gen3-fuse/gen3fuse /usr/local/bin/gen3fuse
 USER jovyan
-COPY config.yaml /home/jovyan/fuse-config.yaml
-COPY sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
 CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
