@@ -9,14 +9,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/jacobsa/fuse"
-	"github.com/jacobsa/fuse/fuseops"
-	"github.com/jacobsa/fuse/fuseutil"
+	"bytes"
 	"net/http"
 	"net/url"
 	"strconv"
-	"bytes"
 	"strings"
+
+	"github.com/jacobsa/fuse"
+	"github.com/jacobsa/fuse/fuseops"
+	"github.com/jacobsa/fuse/fuseutil"
 )
 
 type Gen3Fuse struct {
@@ -32,16 +33,16 @@ type Gen3Fuse struct {
 }
 
 type manifestRecord struct {
-	ObjectId  string  `json:"object_id"`
-	SubjectId string  `json:"subject_id"`
-	Uuid       string  `json:"uuid"`
+	ObjectId  string `json:"object_id"`
+	SubjectId string `json:"subject_id"`
+	Uuid      string `json:"uuid"`
 }
 
 type IndexdResponse struct {
-	Filename string `json:"file_name"`
-	Filesize uint64 `json:"size"`
-	DID string `json:"did"`
-	URLs []string `json:"urls"`
+	Filename string   `json:"file_name"`
+	Filesize uint64   `json:"size"`
+	DID      string   `json:"did"`
+	URLs     []string `json:"urls"`
 }
 
 var LogFilePath string = "fuse_log.txt"
@@ -100,7 +101,7 @@ type inodeInfo struct {
 
 func getFileNameFromURL(inputURL string) (result string, ok bool) {
 	u, err := url.Parse(inputURL)
-	
+
 	if err != nil {
 		FuseLog(fmt.Sprintf("Error parsing out the filename from this URL %s: %s", inputURL, err))
 		return "", false
@@ -144,10 +145,14 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 	// Create an inode for each imaginary file
 	var filesInManifest = []fuseutil.Dirent{}
 	var inodeID fuseops.InodeID = fuseops.RootInodeID + 2
-	
+
 	k := 0
 	for did, fileInfo := range didToFileInfo {
 		filename := fileInfo.Filename
+		if len(fileInfo.URLs) == 0 {
+			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
+			continue
+		}
 
 		if filename == "" && len(fileInfo.URLs) > 0 {
 			// Try to get the filename from the first URL
@@ -157,13 +162,8 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 			}
 		}
 
-		if filename == "" { 
-			filename = did
-		}
-
 		if filename == "" {
-			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
-			continue
+			filename = did
 		}
 
 		var dirEntry = fuseutil.Dirent{
@@ -307,7 +307,7 @@ func (fs *Gen3Fuse) ReadDir(
 		err = fuse.ENOENT
 		return
 	}
-	
+
 	if !info.dir {
 		FuseLog("Error: info.dir is not set true. So we can't read the directory.")
 		var structStr string = fmt.Sprintf("%#v", info)
@@ -355,7 +355,7 @@ func (fs *Gen3Fuse) OpenFile(
 		presignedUrl, err := fs.GetPresignedURL(info.DID)
 		if err != nil {
 			return err
-		} 
+		}
 		info.presignedUrl = presignedUrl
 	}
 
@@ -375,13 +375,13 @@ func (fs *Gen3Fuse) ReadFile(
 	}
 	FuseLog(info.presignedUrl)
 	fileBody, err := FetchContentsAtURL(info.presignedUrl)
-	
+
 	if err != nil {
 		FuseLog("Error fetching file contents: " + err.Error())
 		err = fuse.ENOENT
 		return err
 	}
-	
+
 	reader := strings.NewReader(string(fileBody))
 
 	// op.Offset: The offset within the file at which to read.
@@ -502,11 +502,11 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID)
 	FuseLog("GET " + requestUrl)
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
-	req.Header.Add("Authorization", "Bearer "+ fs.accessToken)
+	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
 	req.Header.Add("Accept", "application/json")
 
 	if err != nil {
@@ -535,10 +535,10 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 
 func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err error) {
 	requestUrl := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
-	
+
 	var DIDsWithQuotes []string
 	for _, x := range fs.DIDs {
-		DIDsWithQuotes = append(DIDsWithQuotes, "\"" + x + "\"")
+		DIDsWithQuotes = append(DIDsWithQuotes, "\""+x+"\"")
 	}
 
 	postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
@@ -548,11 +548,11 @@ func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err 
 	// Decent timeout because there might be lots of files to list
 	timeout := time.Duration(60 * time.Second)
 	client := http.Client{
-	    Timeout: timeout,
+		Timeout: timeout,
 	}
 
-	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer(  []byte(postData)   ))
-	req.Header.Add("Authorization", "Bearer "+ fs.accessToken)
+	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer([]byte(postData)))
+	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -569,7 +569,7 @@ func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err 
 	return resp, nil
 }
 
-func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileInfo map[string]*IndexdResponse, err error) { 
+func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileInfo map[string]*IndexdResponse, err error) {
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 
@@ -580,11 +580,11 @@ func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileIn
 
 	didToFileInfo = make(map[string]*IndexdResponse, 0)
 	for i := 0; i < len(didToFileInfoList); i++ {
-		didToFileInfo[didToFileInfoList[i].DID] = &IndexdResponse{ 
-			Filesize : didToFileInfoList[i].Filesize, 
+		didToFileInfo[didToFileInfoList[i].DID] = &IndexdResponse{
+			Filesize: didToFileInfoList[i].Filesize,
 			Filename: didToFileInfoList[i].Filename,
-			DID: didToFileInfoList[i].DID,
-			URLs: didToFileInfoList[i].URLs,
+			DID:      didToFileInfoList[i].DID,
+			URLs:     didToFileInfoList[i].URLs,
 		}
 	}
 
@@ -597,10 +597,10 @@ func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
 	// Huge timeout because we're about to download a file
 	timeout := time.Duration(500 * time.Second)
 	client := http.Client{
-	    Timeout: timeout,
+		Timeout: timeout,
 	}
 	resp, err := client.Get(presignedUrl)
-	
+
 	// resp, err := http.Get(presignedUrl)
 	if err != nil {
 		FuseLog(err.Error())
@@ -608,7 +608,6 @@ func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
 	}
 	defer resp.Body.Close()
 
-	
 	//var structStr string = fmt.Sprintf("%#v", resp.Header["Content-Length"])
 	//FuseLog("\n Get size: " + structStr + "\n")
 
