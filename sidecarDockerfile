@@ -1,0 +1,12 @@
+FROM golang:1.12-alpine
+
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl
+RUN adduser jovyan -u 1000 -G users -D 
+ADD . $GOPATH/src/gen3-fuse
+WORKDIR $GOPATH/src/gen3-fuse/
+RUN sh ./build.sh
+RUN mv $GOPATH/src/gen3-fuse/config.yaml /home/jovyan/fuse-config.yaml
+RUN mv $GOPATH/src/gen3-fuse/sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
+RUN mv $GOPATH/src/gen3-fuse/gen3fuse /usr/local/bin/gen3fuse
+USER jovyan
+CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
