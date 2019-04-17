@@ -2,7 +2,6 @@
 while true; do
     if [ $(df /data/man* | wc -l) -lt 5 ]; then
         TOKEN_JSON=`curl  http://workspace-token-service.$NAMESPACE/token/ | jq -r '.token'`
-        sleep 20
         MANIFESTEXT=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" | jq --raw-output .manifests[-1].filename`
         if [ $MANIFESTEXT = 'null' ]; then
             # user doens't have any manifest
@@ -17,5 +16,5 @@ while true; do
         OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
         fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
     fi
-    sleep 20
+    sleep 5
 done
