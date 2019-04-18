@@ -30,7 +30,7 @@ touch $BENCH_TIMINGS_FILE
 rm $BENCH_TIMINGS_FILE
 
 # Compile the gen3fuse binary. Exit if build fails
-./build.sh > /dev/null
+go build > /dev/null
 
 if [ $? -ne 0 ]
 then
@@ -79,7 +79,7 @@ function run_test {
 function performance_test_manifest() {
     MANIFEST=$1
     NUM_FILES_IN_THIS_MANIFEST=$2
-    GEN3FUSECMD="./gen3fuse $CONFIG_FILE $MANIFEST $MOUNT_DIR $HOSTNAME $WTS_URL"
+    GEN3FUSECMD="./gen3-fuse $CONFIG_FILE $MANIFEST $MOUNT_DIR $HOSTNAME $WTS_URL"
     SHOULD_WE_TEST_CAT=$3
 
     echo "-------- Testing with $MANIFEST ---------" >> $BENCH_TIMINGS_FILE

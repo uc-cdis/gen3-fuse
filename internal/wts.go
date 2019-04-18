@@ -1,15 +1,16 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/http"
-	"time"
 	"strconv"
-	"bytes"
+	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 type Gen3FuseConfig struct {
@@ -22,7 +23,7 @@ type Gen3FuseConfig struct {
 
 	// Fence configuration
 	FencePresignedURLPath string `yaml:"FencePresignedURLPath"`
-	FenceAccessTokenPath string `yaml:"FenceAccessTokenPath"`
+	FenceAccessTokenPath  string `yaml:"FenceAccessTokenPath"`
 
 	// Indexd configuration
 	IndexdBulkFileInfoPath string `yaml:"IndexdBulkFileInfoPath"`
@@ -71,7 +72,7 @@ func getJson(url string, target interface{}) (err error, ok bool) {
 	}
 	defer r.Body.Close()
 
-	if r.StatusCode != 200 { 
+	if r.StatusCode != 200 {
 		return errors.New(strconv.Itoa(r.StatusCode)), false
 	}
 
@@ -96,27 +97,27 @@ func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
 		FuseLog("Error connecting with fence via the workspace token service at " + requestUrl)
 		var fenceResponseStr string = fmt.Sprintf("%#v", fenceResponse)
 		FuseLog("The workspace token service came back with: " + fenceResponseStr)
-		return errors.New("Error connecting with fence via the workspace token service at " + requestUrl + ". Fence response: " + fenceResponseStr + 
+		return errors.New("Error connecting with fence via the workspace token service at " + requestUrl + ". Fence response: " + fenceResponseStr +
 			".\n Are you sure the Workspace Token Service is configured correctly?")
 	}
 
 	return
 }
 
-func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) { 
-	if (gen3FuseConfig.ApiKey != "") {
-		return GetAccessTokenWithApiKey(gen3FuseConfig);
+func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
+	if gen3FuseConfig.ApiKey != "" {
+		return GetAccessTokenWithApiKey(gen3FuseConfig)
 	}
 
-	return GetAccessTokenFromWTS(gen3FuseConfig);
+	return GetAccessTokenFromWTS(gen3FuseConfig)
 }
 
 func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
 	requestUrl := gen3FuseConfig.Hostname + gen3FuseConfig.FenceAccessTokenPath
-	
-	var jsonStr = []byte(fmt.Sprintf(`{"api_key" : "%s"}` , gen3FuseConfig.ApiKey))
-    req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer(jsonStr))
-    req.Header.Set("Content-Type", "application/json")
+
+	var jsonStr = []byte(fmt.Sprintf(`{"api_key" : "%s"}`, gen3FuseConfig.ApiKey))
+	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
 	r, err := myClient.Do(req)
 	if err != nil {
 		return "", err
@@ -139,8 +140,7 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 
 func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
 	tokenLifetimeInSeconds := 3600
-	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
-	FuseLog(requestUrl)
+	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL+gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
 	tokenResponse := new(tokenResponse)
 	err, ok := getJson(requestUrl, tokenResponse)
 	if err != nil || !ok {

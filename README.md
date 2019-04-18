@@ -39,7 +39,7 @@ You can choose where errors are logged in the yaml config file. By default they 
     cd gen3-fuse/
 
     # Build
-    ./build.sh
+    go build
 
     # Run (note the fields you need to fill in)
     ./gen3fuse  <path to config yaml file> <path to manifest json file> <directory to mount>
@@ -49,7 +49,7 @@ For a Kubernetes deployment into a Jupyter pod, config.yaml may be appropriate. 
     
 To safely unmount Gen3Fuse for any reason:
     
-    umount -f <mounted directory>
+    fusermount -u <mounted directory>
 
 Note that Gen3Fuse will make an Unmount call on the mount point provided to it before it mounts the directory. 
 
