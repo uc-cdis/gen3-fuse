@@ -27,7 +27,7 @@ type Gen3Fuse struct {
 
 	DIDs []string
 
-	inodes map[fuseops.InodeID]inodeInfo
+	inodes map[fuseops.InodeID]*inodeInfo
 
 	gen3FuseConfig *Gen3FuseConfig
 }
@@ -92,6 +92,9 @@ type inodeInfo struct {
 	// For directories, Children.
 	Children []fuseutil.Dirent
 
+	// File name, useful for debugging
+	Name string
+
 	// For files, the DID
 	DID string
 
@@ -99,20 +102,20 @@ type inodeInfo struct {
 	presignedUrl string
 }
 
-func getFileNameFromURL(inputURL string) (result string, ok bool) {
+func getFilePathFromURL(inputURL string) (result []string, ok bool) {
 	u, err := url.Parse(inputURL)
 
 	if err != nil {
 		FuseLog(fmt.Sprintf("Error parsing out the filename from this URL %s: %s", inputURL, err))
-		return "", false
+		return nil, false
 	}
 
-	filenameWithSlashes := u.Path
-	filename := strings.Replace(filenameWithSlashes, "/", "", -1)
-	return filename, true
+	filePaths := strings.Split(u.Path, "/")
+	// return the cloud path without bucket name
+	return filePaths[1:len(filePaths)], true
 }
 
-func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.InodeID]inodeInfo {
+func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.InodeID]*inodeInfo {
 	/*
 		Create a file system with a fixed structure described by the manifest
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
@@ -121,21 +124,37 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 	FuseLog("Inside InitializeInodes")
 	const (
 		rootInode fuseops.InodeID = fuseops.RootInodeID + iota
-		exportedFilesInode
+		byIDDir
+		byFilenameDir
+		byFilepathDir
 	)
-	var inodes = map[fuseops.InodeID]inodeInfo{
+
+	var inodes = map[fuseops.InodeID]*inodeInfo{
 		// root inode
-		rootInode: inodeInfo{
+		rootInode: &inodeInfo{
 			attributes: fuseops.InodeAttributes{
 				Nlink: 1,
 				Mode:  0555 | os.ModeDir,
 			},
-			dir: true,
+			dir:  true,
+			Name: "root",
 			Children: []fuseutil.Dirent{
 				fuseutil.Dirent{
 					Offset: 1,
-					Inode:  exportedFilesInode,
-					Name:   "exported_files",
+					Inode:  byIDDir,
+					Name:   "by-guid",
+					Type:   fuseutil.DT_Directory,
+				},
+				fuseutil.Dirent{
+					Offset: 2,
+					Inode:  byFilenameDir,
+					Name:   "by-filename",
+					Type:   fuseutil.DT_Directory,
+				},
+				fuseutil.Dirent{
+					Offset: 3,
+					Inode:  byFilepathDir,
+					Name:   "by-filepath",
 					Type:   fuseutil.DT_Directory,
 				},
 			},
@@ -143,64 +162,113 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 	}
 
 	// Create an inode for each imaginary file
-	var filesInManifest = []fuseutil.Dirent{}
-	var inodeID fuseops.InodeID = fuseops.RootInodeID + 2
+	var inodeID fuseops.InodeID = fuseops.RootInodeID + 4
+	inodeIDMap := make(map[string]fuseops.InodeID)
+	// inode for top level dirs that contains the imaginary files described in the manifest
+	topDirs := map[string]fuseops.InodeID{
+		"by-id":       byIDDir,
+		"by-filename": byFilenameDir,
+		"by-filepath": byFilepathDir,
+	}
+	for name, inode := range topDirs {
+		inodes[inode] = &inodeInfo{
+			attributes: fuseops.InodeAttributes{
+				Nlink: 1,
+				Mode:  0555 | os.ModeDir,
+			},
+			dir:      true,
+			Name:     name,
+			Children: []fuseutil.Dirent{},
+		}
+	}
 
-	k := 0
 	for did, fileInfo := range didToFileInfo {
-		filename := fileInfo.Filename
 		if len(fileInfo.URLs) == 0 {
 			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
 			continue
 		}
+		// inode for by-id file
+		createInode(inodes, byIDDir, inodeID, did, did, fileInfo.Filesize)
+		inodeID++
 
-		if filename == "" && len(fileInfo.URLs) > 0 {
-			// Try to get the filename from the first URL
-			res, ok := getFileNameFromURL(fileInfo.URLs[0])
+		// Try to get the filename from the first URL
+		paths, ok := getFilePathFromURL(fileInfo.URLs[0])
+
+		if !ok {
+			continue
+		}
+		filename := paths[len(paths)-1]
+		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize)
+		inodeID++
+		for i := 0; i <= len(paths)-1; i++ {
+			filename := paths[i]
+			fullpath := strings.Join(paths[0:i+1], "/")
+			parentpath := strings.Join(paths[0:i], "/")
+			// this folder is already created in another guid lookup
+			_, ok := inodeIDMap[fullpath]
 			if ok {
-				filename = res
+				continue
 			}
+			if i == 0 {
+				createInode(inodes, byFilepathDir, inodeID, filename, "", 0)
+			} else if i == len(paths)-1 {
+				parentNode := inodeIDMap[parentpath]
+				createInode(inodes, parentNode, inodeID, filename, did, fileInfo.Filesize)
+			} else {
+				parentNode := inodeIDMap[parentpath]
+				createInode(inodes, parentNode, inodeID, filename, "", 0)
+			}
+			inodeIDMap[fullpath] = inodeID
+			inodeID++
 		}
 
-		if filename == "" {
-			filename = did
-		}
+	}
+	return inodes
+}
 
-		var dirEntry = fuseutil.Dirent{
-			Offset: fuseops.DirOffset(k + 1),
-			Inode:  inodeID,
-			Name:   filename,
-			Type:   fuseutil.DT_File,
+func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64) {
+	parent, ok := inodes[parentID]
+	if !ok {
+		panic(fmt.Sprintf("Something went wrong, can't find parent folder for %v, guid %v", filename, did))
+	}
+	curIDSlice := parent.Children
+	offset := fuseops.DirOffset(1)
+	if len(curIDSlice) > 0 {
+		offset = curIDSlice[len(curIDSlice)-1].Offset + 1
+	}
+	inodeType := fuseutil.DT_File
+	if did == "" {
+		inodeType = fuseutil.DT_Directory
+	}
+	var dirEntry = fuseutil.Dirent{
+		Offset: fuseops.DirOffset(offset),
+		Inode:  inodeID,
+		Name:   filename,
+		Type:   inodeType,
+	}
+	curIDSlice = append(curIDSlice, dirEntry)
+	inodes[parentID].Children = curIDSlice
+	if did == "" {
+		inodes[inodeID] = &inodeInfo{
+			attributes: fuseops.InodeAttributes{
+				Nlink: 1,
+				Mode:  0555 | os.ModeDir,
+			},
+			dir:      true,
+			Name:     filename,
+			Children: []fuseutil.Dirent{},
 		}
-		filesInManifest = append(filesInManifest, dirEntry)
-
-		// Make a new inode for this manifest DID
-		inodes[inodeID] = inodeInfo{
+	} else {
+		inodes[inodeID] = &inodeInfo{
 			attributes: fuseops.InodeAttributes{
 				Nlink: 1,
 				Mode:  0444,
-				Size:  fileInfo.Filesize,
+				Size:  filesize,
 			},
-			DID: did,
+			Name: filename,
+			DID:  did,
 		}
-
-		inodeID += 1
-		k += 1
 	}
-
-	FuseLog(fmt.Sprintf("Added %d inode entries to exported_files/", k))
-
-	// inode for directory that contains the imaginary files described in the manifest
-	inodes[exportedFilesInode] = inodeInfo{
-		attributes: fuseops.InodeAttributes{
-			Nlink: 1,
-			Mode:  0555 | os.ModeDir,
-		},
-		dir:      true,
-		Children: filesInManifest,
-	}
-
-	return inodes
 }
 
 func findChildInode(
