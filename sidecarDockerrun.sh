@@ -10,7 +10,7 @@ while true; do
         FILENAME=`echo $MANIFESTEXT | sed 's/\.[^.]*$//'`
         if [ ! -d /data/$FILENAME ]; then
             curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > ~/manifest.json
-            gen3fuse ~/fuse-config.yaml ~/manifest.json /data/$FILENAME https://$HOSTNAME http://workspace-token-service.$NAMESPACE
+            gen3-fuse ~/fuse-config.yaml ~/manifest.json /data/$FILENAME https://$HOSTNAME http://workspace-token-service.$NAMESPACE
         fi
     else
         OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
