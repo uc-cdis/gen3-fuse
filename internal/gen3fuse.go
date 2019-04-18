@@ -74,8 +74,6 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 			return nil, err
 		}
 
-		//var structStr string = fmt.Sprintf("%#v", didToFileInfo)
-		//FuseLog("\n Indexd response: " + structStr + "\n")
 	}
 
 	fs.inodes = InitializeInodes(didToFileInfo)
