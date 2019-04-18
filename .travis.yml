@@ -26,14 +26,14 @@ deploy:
   - provider: releases
     skip_cleanup: true
     api_key:
-      secure: "LgObHh04RLtzfbBDzlpxeSpHTWMzJpSbqyuVUZlJyn8SM32vU39oUSwEuF1cb1qtJwcfhF3cN19kFFmv8FqGosyDnvfrYj1hwvvnh2akMzqgy1bY9UogvrFOuAc118uaW0d7ycdiDGn3OdqoYvgKQKQhcbHrwfmHNUqueHVErXPf76lLjFsTbVVceWzdDHUSJCgjaF8BOPcHI11eV186+LmhEdlXoeMxFrLNRRGOKCCDpCxEYpscUryuKolsQ9308xS5zial+mt2eTZXVqQNVhyuR5/RGIBqGdGOH6G/aLG4CV3NWEtWd/th+JFbWXEDpRcDX+nYQZTlBJ53mryPw/MFyjhnN/rKsG5jbh5XUrIyq8Cf1D9EyyxBeUNHdEyBX5BWiGzpvG+GAnAvyGs5NcwAphCKgOXRlZP+JyFzKo1sja8TRrfhpe1ltgVszMbnt8z1cxyQ7WIEUJmBWvNN+Sbku0cfVlrksRjphFm1K4ahWFZQgQ00QtEvFumCLDmoIBzIWVxzkKdW6TlJ+yNCYDSQhs5al58I/bjdHr9bFWkIGvxcgtXXnT2uO2lWtU7PTvlc2aD/ACaNdkvaatGgyD8tno0hjpDMY/OUN06I9ggMnm+YqC/s9qIqBhDpPUNvI/3PlJejmx9H+C0aZEk3Gnnp3IvttJjSEdlzCQOwRVE="
+      secure: "Vpz/J/20OU1ZWOkY7AdtDX1Z7iE47pFbP5Bq9XgYBrWmqK3Iw/u6FtM22qOuzJtkmwG6qDuRwnNn1Ep5vphC0QxZopggpe19ngP05IpdicOPgUuS92fzqvpOGIBRD7PHqtQQLRtRSHoF8LRjmabxkjiBR6Xglgd37Qj2YXwFG+KyaJjkoG/3/w9dDdF87LrdOrWAvS0fVIZRs+Vk6VxalMJjGuzIcI27jgGAdML7dSK/UY1Fh/9EtrU7f1YNhGw4Gzx9neVCFtIfGNDeVGzgF5j4LcGzNNwOrAR7eVLso5vqmqVgWR4eXN/5GFh/UzVQ/QyUi9Ioo3AUQaJCdrKnVU1bRAuJ2Cu3jvlelmfzozTb/6ORFnR31mmxj3FKd4TJVBdHcfvG20lCyCYCy7yvQpPgcAr+nao3Mrh+omnycQ5CFUirnHv2GSvcbgjeq058AA/8qLwyuTz8S6PyIsw1RTaptdg0jirCxc6dCBOgMEpmcamQFajH/70k7wTkmPXxZ8x40qrZCJb1YlcqY2XO5evf0jOPdQt2zLKNMxeNPC5UT2EiCWz/gP0/VyqVwaQIy5lv/TCdT/8MrBWxrKx/ybxwg9Ja4xxDBJ0F8HghnYKAPd7i0mC8zkP5wcWzyqi5ET5hvZNcaMvJLGhA+ZphvR0mHh71Vp7/XoBd3P/ol+U="
     file:
       - artifacts/gen3fuse_darwin.zip
       - artifacts/gen3fuse_linux.zip
     on:
       branch: master
       tags: true
-    # creds are in travis env var settings, there is a bug with travis that putting the key here results in generating  signature that does not match
+    # creds are in travis env var settings, there is a problem with travis that putting the key here results in generating  signature that does not match
   - provider: s3
     bucket: gen3-fuse-builds
     local-dir: artifacts
