@@ -1,4 +1,5 @@
 #!/bin/sh
+sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
 while true; do
     if [ $(df /data/man* | wc -l) -lt 5 ]; then
         TOKEN_JSON=`curl  http://workspace-token-service.$NAMESPACE/token/ | jq -r '.token'`
