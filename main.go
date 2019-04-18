@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	gen3fuse "gen3-fuse/api"
 	"os"
+
+	gen3fuse "github.com/uc-cdis/gen3-fuse/api"
 )
 
 func main() {
@@ -12,13 +13,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	configFileName := os.Args[1]	
+	configFileName := os.Args[1]
 	manifestFilePath := os.Args[2]
 	mountPoint := os.Args[3]
 	hostname := os.Args[4]
 	wtsURL := os.Args[5]
 	apiKey := ""
-	if len(os.Args) == 7 { 
+	if len(os.Args) == 7 {
 		apiKey = os.Args[6]
 	}
 
@@ -32,7 +33,7 @@ func main() {
 	gen3fuse.Unmount(mountPoint)
 
 	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
-	    os.Mkdir(mountPoint, 0777)
+		os.Mkdir(mountPoint, 0777)
 	}
 
 	if _, err := os.Stat(manifestFilePath); os.IsNotExist(err) {

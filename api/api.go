@@ -1,17 +1,17 @@
 package gen3fuse
 
 import (
-	"gen3-fuse/internal"
+	"github.com/uc-cdis/gen3-fuse/internal"
 )
 
 // expose Gen3Fuse functions from the internal package
 var (
-	ConnectWithFence = internal.ConnectWithFence
-	NewGen3Fuse      = internal.NewGen3Fuse
+	ConnectWithFence          = internal.ConnectWithFence
+	NewGen3Fuse               = internal.NewGen3Fuse
 	NewGen3FuseConfigFromYaml = internal.NewGen3FuseConfigFromYaml
-	InitializeApp    = internal.InitializeApp
-	Mount            = internal.Mount
-	Unmount          = internal.Unmount
+	InitializeApp             = internal.InitializeApp
+	Mount                     = internal.Mount
+	Unmount                   = internal.Unmount
 )
 
 type (
