@@ -100,11 +100,22 @@ type inodeInfo struct {
 	presignedUrl string
 }
 
-func getFilePathFromURL(inputURL string) (result []string, ok bool) {
-	u, err := url.Parse(inputURL)
-
+func getFilePathFromURL(urls []string) (result []string, ok bool) {
+	validURL := ""
+	for _, uri := range urls {
+		parsed, err := url.Parse(uri)
+		if err == nil && (parsed.Scheme == "s3" || parsed.Scheme == "gcs") {
+			validURL = uri
+			break
+		}
+		FuseLog(fmt.Sprintf("Skipping url %v, protocol not supported", uri))
+	}
+	if validURL == "" {
+		return nil, false
+	}
+	u, err := url.Parse(validURL)
 	if err != nil {
-		FuseLog(fmt.Sprintf("Error parsing out the filename from this URL %s: %s", inputURL, err))
+		FuseLog(fmt.Sprintf("Error parsing out the filename from this URL %s: %s", validURL, err))
 		return nil, false
 	}
 
@@ -185,12 +196,13 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 			FuseLog(fmt.Sprintf("Indexd record %s does not seem to have a file associated with it; ignoring it.", did))
 			continue
 		}
+
 		// inode for by-id file
 		createInode(inodes, byIDDir, inodeID, did, did, fileInfo.Filesize)
 		inodeID++
 
 		// Try to get the filename from the first URL
-		paths, ok := getFilePathFromURL(fileInfo.URLs[0])
+		paths, ok := getFilePathFromURL(fileInfo.URLs)
 
 		if !ok {
 			continue
@@ -198,6 +210,12 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 		filename := paths[len(paths)-1]
 		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize)
 		inodeID++
+		if len(paths) == 1 {
+			createInode(inodes, byFilepathDir, inodeID, filename, did, fileInfo.Filesize)
+			inodeID++
+			continue
+		}
+
 		for i := 0; i <= len(paths)-1; i++ {
 			filename := paths[i]
 			fullpath := strings.Join(paths[0:i+1], "/")
@@ -208,11 +226,14 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 				continue
 			}
 			if i == 0 {
+				// root directory, it's parent is byFilepathDir
 				createInode(inodes, byFilepathDir, inodeID, filename, "", 0)
 			} else if i == len(paths)-1 {
+				// leaf file
 				parentNode := inodeIDMap[parentpath]
 				createInode(inodes, parentNode, inodeID, filename, did, fileInfo.Filesize)
 			} else {
+				// intermediate directory
 				parentNode := inodeIDMap[parentpath]
 				createInode(inodes, parentNode, inodeID, filename, "", 0)
 			}
