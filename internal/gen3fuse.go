@@ -460,8 +460,9 @@ func (fs *Gen3Fuse) ReadFile(
 		err = fuse.ENOENT
 		return
 	}
-	FuseLog(info.presignedUrl)
-	fileBody, err := FetchContentsAtURL(info.presignedUrl)
+	size := int64(len(op.Dst))
+	FuseLog(fmt.Sprintf("get %v with offset %v size %v", info.presignedUrl, op.Offset, size))
+	fileBody, err := FetchContentsAtURL(info.presignedUrl, op.Offset, size)
 
 	if err != nil {
 		FuseLog("Error fetching file contents: " + err.Error())
@@ -474,8 +475,7 @@ func (fs *Gen3Fuse) ReadFile(
 	// op.Offset: The offset within the file at which to read.
 	// op.Dst: The destination buffer, whose length gives the size of the read.
 
-	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
-	//FuseLog(string(op.Dst))
+	op.BytesRead, err = reader.ReadAt(op.Dst, 0)
 	FuseLog(strconv.Itoa(op.BytesRead))
 	if op.BytesRead > 0 {
 		return nil
@@ -678,7 +678,7 @@ func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileIn
 	return didToFileInfo, nil
 }
 
-func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
+func FetchContentsAtURL(presignedUrl string, offset int64, size int64) (byteContents []byte, err error) {
 	FuseLog("\nGET " + presignedUrl)
 
 	// Huge timeout because we're about to download a file
@@ -686,7 +686,11 @@ func FetchContentsAtURL(presignedUrl string) (byteContents []byte, err error) {
 	client := http.Client{
 		Timeout: timeout,
 	}
-	resp, err := client.Get(presignedUrl)
+	req, _ := http.NewRequest("GET", presignedUrl, nil)
+	if !(offset == 0 && size == 0) {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+size))
+	}
+	resp, err := client.Do(req)
 
 	// resp, err := http.Get(presignedUrl)
 	if err != nil {

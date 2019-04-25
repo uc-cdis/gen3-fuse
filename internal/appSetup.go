@@ -55,7 +55,7 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 
 	if fs == nil {
 		err = fmt.Errorf("Mount: initialization failed")
-		return 
+		return
 	}
 	server := fuseutil.NewFileSystemServer(fs)
 
@@ -76,7 +76,7 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		return
 	}
 
-	FuseLog(fmt.Sprintf("Your exported files have been mounted to %s/exported_files.\n", mountPoint))
+	FuseLog(fmt.Sprintf("Your exported files have been mounted to %s/\n", mountPoint))
 
 	return
 }
@@ -112,7 +112,7 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 				return
 			}
 			return fuse.EINVAL
-		} 
+		}
 		// kill our own waiting goroutine
 		kill(os.Getpid(), syscall.SIGUSR1)
 		wg.Wait()
