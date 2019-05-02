@@ -173,6 +173,9 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 	// Create an inode for each imaginary file
 	var inodeID fuseops.InodeID = fuseops.RootInodeID + 4
 	inodeIDMap := make(map[string]fuseops.InodeID)
+	inodeIDMap["by-guid"] = byIDDir
+	inodeIDMap["by-filename"] = byFilenameDir
+	inodeIDMap["by-filepath"] = byFilepathDir
 	// inode for top level dirs that contains the imaginary files described in the manifest
 	topDirs := map[string]fuseops.InodeID{
 		"by-id":       byIDDir,
@@ -198,7 +201,10 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 		}
 
 		// inode for by-id file
-		createInode(inodes, byIDDir, inodeID, did, did, fileInfo.Filesize)
+		// GUIDs can have prefix as folders
+		guidPaths := append([]string{"by-guid"}, strings.Split(did, "/")...)
+		inodeID = createInodeForDirs(inodes, inodeID, guidPaths, inodeIDMap, did, fileInfo.Filesize)
+
 		inodeID++
 
 		// Try to get the filename from the first URL
@@ -210,39 +216,38 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 		filename := paths[len(paths)-1]
 		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize)
 		inodeID++
-		if len(paths) == 1 {
-			createInode(inodes, byFilepathDir, inodeID, filename, did, fileInfo.Filesize)
-			inodeID++
-			continue
-		}
-
-		for i := 0; i <= len(paths)-1; i++ {
-			filename := paths[i]
-			fullpath := strings.Join(paths[0:i+1], "/")
-			parentpath := strings.Join(paths[0:i], "/")
-			// this folder is already created in another guid lookup
-			_, ok := inodeIDMap[fullpath]
-			if ok {
-				continue
-			}
-			if i == 0 {
-				// root directory, it's parent is byFilepathDir
-				createInode(inodes, byFilepathDir, inodeID, filename, "", 0)
-			} else if i == len(paths)-1 {
-				// leaf file
-				parentNode := inodeIDMap[parentpath]
-				createInode(inodes, parentNode, inodeID, filename, did, fileInfo.Filesize)
-			} else {
-				// intermediate directory
-				parentNode := inodeIDMap[parentpath]
-				createInode(inodes, parentNode, inodeID, filename, "", 0)
-			}
-			inodeIDMap[fullpath] = inodeID
-			inodeID++
-		}
-
+		paths = append([]string{"by-filepath"}, paths...)
+		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize)
 	}
 	return inodes
+}
+
+func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.InodeID, paths []string, inodeIDMap map[string]fuseops.InodeID, did string, filesize uint64) fuseops.InodeID {
+	for i := 0; i <= len(paths)-1; i++ {
+		filename := paths[i]
+		fullpath := strings.Join(paths[0:i+1], "/")
+		parentpath := strings.Join(paths[0:i], "/")
+		// this folder is already created in another guid lookup
+		_, ok := inodeIDMap[fullpath]
+		if ok {
+			continue
+		}
+		parentNode, ok := inodeIDMap[parentpath]
+		if !ok {
+			FuseLog(fmt.Sprintf("Fail to find parent folder %v for %v", parentpath, filename))
+			continue
+		}
+		if i == len(paths)-1 {
+			// leaf file
+			createInode(inodes, parentNode, inodeID, filename, did, filesize)
+		} else {
+			// intermediate directory
+			createInode(inodes, parentNode, inodeID, filename, "", 0)
+		}
+		inodeIDMap[fullpath] = inodeID
+		inodeID++
+	}
+	return inodeID
 }
 
 func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64) {
