@@ -45,6 +45,16 @@ type IndexdResponse struct {
 	URLs     []string `json:"urls"`
 }
 
+// APIError carriese a failure to get a 2XX response
+type APIError struct {
+	StatusCode int
+	URL        string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("Fail to fetch %v, status code: %v", e.URL, e.StatusCode)
+}
+
 var LogFilePath string = "fuse_log.txt"
 
 func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFilePath string) (fs *Gen3Fuse, err error) {
@@ -466,9 +476,21 @@ func (fs *Gen3Fuse) ReadFile(
 		return
 	}
 	size := int64(len(op.Dst))
-	FuseLog(fmt.Sprintf("get %v with offset %v size %v", info.presignedUrl, op.Offset, size))
+	FuseLog(fmt.Sprintf("get %v with offset %v size %v", info.DID, op.Offset, size))
 	fileBody, err := FetchContentsAtURL(info.presignedUrl, op.Offset, size)
-
+	if apiErr, ok := err.(*APIError); ok {
+		// aws returns 403 when URL is expired
+		if apiErr.StatusCode == 403 {
+			FuseLog(fmt.Sprintf("Get a fresh url for %v", info.DID))
+			presignedURL, err := fs.GetPresignedURL(info.DID)
+			if err != nil {
+				FuseLog("Error fetching file contents: " + err.Error())
+				return fuse.ENOENT
+			}
+			info.presignedUrl = presignedURL
+			fileBody, err = FetchContentsAtURL(info.presignedUrl, op.Offset, size)
+		}
+	}
 	if err != nil {
 		FuseLog("Error fetching file contents: " + err.Error())
 		err = fuse.ENOENT
@@ -594,7 +616,7 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID+"?expires_in=900")
 	FuseLog("GET " + requestUrl)
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
@@ -684,7 +706,6 @@ func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileIn
 }
 
 func FetchContentsAtURL(presignedUrl string, offset int64, size int64) (byteContents []byte, err error) {
-	FuseLog("\nGET " + presignedUrl)
 
 	// Huge timeout because we're about to download a file
 	timeout := time.Duration(500 * time.Second)
@@ -696,6 +717,9 @@ func FetchContentsAtURL(presignedUrl string, offset int64, size int64) (byteCont
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+size))
 	}
 	resp, err := client.Do(req)
+	if resp.StatusCode >= 400 {
+		return nil, &APIError{resp.StatusCode, presignedUrl}
+	}
 
 	// resp, err := http.Get(presignedUrl)
 	if err != nil {
