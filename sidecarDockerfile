@@ -1,6 +1,6 @@
 FROM golang:1.12-alpine
 
-RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python3
 RUN adduser jovyan -u 1000 -G users -D
 RUN echo $GOPATH
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
