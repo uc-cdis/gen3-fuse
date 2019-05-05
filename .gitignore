@@ -16,3 +16,4 @@ test-data/
 exported_files/
 bench-times.txt
 performance-test-log.txt
+.vscode

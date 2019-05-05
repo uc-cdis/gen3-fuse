@@ -104,7 +104,7 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 	defer r.Body.Close()
 
 	if r.StatusCode != 200 {
-		fmt.Println("Error obtaining access token from the Fence at " + requestUrl)
+		FuseLog(fmt.Sprintf("Error obtaining access token from the Fence at %v", requestUrl))
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		bodyString := string(bodyBytes)
 		FuseLog(bodyString)
