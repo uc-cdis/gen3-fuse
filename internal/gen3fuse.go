@@ -482,13 +482,19 @@ func (fs *Gen3Fuse) ReadFile(
 		// aws returns 403 when URL is expired
 		if apiErr.StatusCode == 403 {
 			FuseLog(fmt.Sprintf("Get a fresh url for %v", info.DID))
-			presignedURL, err := fs.GetPresignedURL(info.DID)
-			if err != nil {
-				FuseLog("Error fetching file contents: " + err.Error())
-				return fuse.ENOENT
+			presignedURL, urlErr := fs.GetPresignedURL(info.DID)
+			if urlErr != nil {
+				FuseLog("Error fetching file contents: " + urlErr.Error())
+				err = fuse.ENOENT
+				return err
 			}
 			info.presignedUrl = presignedURL
 			fileBody, err = FetchContentsAtURL(info.presignedUrl, op.Offset, size)
+			if err != nil {
+				FuseLog("Error re-fetching file contents: " + err.Error())
+				err = fuse.ENOENT
+				return err
+			}
 		}
 	}
 	if err != nil {
@@ -618,6 +624,7 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
 	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID+"?expires_in=900")
 	FuseLog("GET " + requestUrl)
+	FuseLog(fmt.Sprintf("With token %v", fs.accessToken))
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
 	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
@@ -640,7 +647,6 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
-	FuseLog(bodyString)
 
 	var urlResponse presignedURLResponse
 	json.Unmarshal([]byte(bodyString), &urlResponse)

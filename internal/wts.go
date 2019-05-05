@@ -17,9 +17,8 @@ type Gen3FuseConfig struct {
 	LogFilePath string `yaml:"LogFilePath"`
 
 	// Workspace Token Service configuration
-	WTSBaseURL          string
-	WTSFenceConnectPath string `yaml:"WTSFenceConnectPath"`
-	WTSAccessTokenPath  string `yaml:"WTSAccessTokenPath"`
+	WTSBaseURL         string
+	WTSAccessTokenPath string `yaml:"WTSAccessTokenPath"`
 
 	// Fence configuration
 	FencePresignedURLPath string `yaml:"FencePresignedURLPath"`
@@ -63,45 +62,25 @@ type fenceAccessTokenResponse struct {
 	Token string `json:"access_token"`
 }
 
-var myClient = &http.Client{Timeout: 10 * time.Second}
+var myClient = &http.Client{Timeout: 20 * time.Second}
 
-func getJson(url string, target interface{}) (err error, ok bool) {
+func getJson(url string, target interface{}) (err error) {
 	r, err := myClient.Get(url)
 	if err != nil {
-		return err, false
+		return err
 	}
 	defer r.Body.Close()
 
 	if r.StatusCode != 200 {
-		return errors.New(strconv.Itoa(r.StatusCode)), false
+		return errors.New(strconv.Itoa(r.StatusCode))
 	}
 
 	err = json.NewDecoder(r.Body).Decode(target)
 	if err != nil {
-		return err, false
-	}
-
-	return nil, true
-}
-
-func ConnectWithFence(gen3FuseConfig *Gen3FuseConfig) (err error) {
-	requestUrl := gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSFenceConnectPath
-	fenceResponse := new(fenceConnectResponse)
-
-	err, ok := getJson(requestUrl, fenceResponse)
-	if err != nil || !ok {
 		return err
 	}
 
-	if fenceResponse.Success != "connected with fence" {
-		FuseLog("Error connecting with fence via the workspace token service at " + requestUrl)
-		var fenceResponseStr string = fmt.Sprintf("%#v", fenceResponse)
-		FuseLog("The workspace token service came back with: " + fenceResponseStr)
-		return errors.New("Error connecting with fence via the workspace token service at " + requestUrl + ". Fence response: " + fenceResponseStr +
-			".\n Are you sure the Workspace Token Service is configured correctly?")
-	}
-
-	return
+	return nil
 }
 
 func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
@@ -139,20 +118,15 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 }
 
 func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
-	tokenLifetimeInSeconds := 3600
-	requestUrl := fmt.Sprintf(gen3FuseConfig.WTSBaseURL+gen3FuseConfig.WTSAccessTokenPath, tokenLifetimeInSeconds)
+	requestUrl := fmt.Sprint(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath)
 	tokenResponse := new(tokenResponse)
-	err, ok := getJson(requestUrl, tokenResponse)
-	if err != nil || !ok {
-		return "", err
-	}
+	err = getJson(requestUrl, tokenResponse)
 
-	if len(tokenResponse.Token) == 0 {
-		fmt.Println("Error obtaining access token from the workspace token service at " + requestUrl)
-		wtsReturned := fmt.Sprintf("WTS returned %s\n", tokenResponse)
-		fmt.Printf(wtsReturned)
-		return "", errors.New("Error obtaining access token from the workspace token service at " + requestUrl + ". " + wtsReturned)
+	if len(tokenResponse.Token) == 0 || err != nil {
+		FuseLog("Error obtaining access token from the workspace token service at " + requestUrl)
+		FuseLog(fmt.Sprintf("WTS returned %s, error %v\n", tokenResponse, err.Error()))
+		return "", errors.New("Error obtaining access token from the workspace token service at " + requestUrl + ". " + err.Error())
 	}
-
+	FuseLog(fmt.Sprintf("Get access token %v", tokenResponse.Token))
 	return tokenResponse.Token, nil
 }
