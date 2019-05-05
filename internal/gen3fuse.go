@@ -45,6 +45,16 @@ type IndexdResponse struct {
 	URLs     []string `json:"urls"`
 }
 
+// APIError carriese a failure to get a 2XX response
+type APIError struct {
+	StatusCode int
+	URL        string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("Fail to fetch %v, status code: %v", e.URL, e.StatusCode)
+}
+
 var LogFilePath string = "fuse_log.txt"
 
 func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFilePath string) (fs *Gen3Fuse, err error) {
@@ -230,6 +240,7 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		// this folder is already created in another guid lookup
 		_, ok := inodeIDMap[fullpath]
 		if ok {
+			FuseLog(fmt.Sprintf("%v Already exists", fullpath))
 			continue
 		}
 		parentNode, ok := inodeIDMap[parentpath]
@@ -466,9 +477,28 @@ func (fs *Gen3Fuse) ReadFile(
 		return
 	}
 	size := int64(len(op.Dst))
-	FuseLog(fmt.Sprintf("get %v with offset %v size %v", info.presignedUrl, op.Offset, size))
-	fileBody, err := FetchContentsAtURL(info.presignedUrl, op.Offset, size)
-
+	fullsize := int64(info.attributes.Size)
+	FuseLog(fmt.Sprintf("get %v with offset %v size %v", info.DID, op.Offset, size))
+	fileBody, err := FetchContentsAtURL(info.presignedUrl, op.Offset, size, fullsize)
+	if apiErr, ok := err.(*APIError); ok {
+		// aws returns 403 when URL is expired
+		if apiErr.StatusCode == 403 {
+			FuseLog(fmt.Sprintf("Get a fresh url for %v", info.DID))
+			presignedURL, urlErr := fs.GetPresignedURL(info.DID)
+			if urlErr != nil {
+				FuseLog("Error fetching file contents: " + urlErr.Error())
+				err = fuse.ENOENT
+				return err
+			}
+			info.presignedUrl = presignedURL
+			fileBody, err = FetchContentsAtURL(info.presignedUrl, op.Offset, size, fullsize)
+			if err != nil {
+				FuseLog("Error re-fetching file contents: " + err.Error())
+				err = fuse.ENOENT
+				return err
+			}
+		}
+	}
 	if err != nil {
 		FuseLog("Error fetching file contents: " + err.Error())
 		err = fuse.ENOENT
@@ -500,38 +530,6 @@ func (fs *Gen3Fuse) ReadFile(
 
 type presignedURLResponse struct {
 	Url string
-}
-
-func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResponse, err error) {
-	resp, err := fs.FetchBulkSizeResponseFromIndexd()
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		return fs.FileInfoFromIndexdResponse(resp)
-	} else if resp.StatusCode == 401 {
-		// get a new access token, try again just one more time
-		FuseLog("Got 401, retrying...")
-		fs.accessToken, err = GetAccessToken(fs.gen3FuseConfig)
-		if err != nil {
-			return nil, err
-		}
-		respRetry, err := fs.FetchBulkSizeResponseFromIndexd()
-		if err != nil {
-			return nil, err
-		}
-
-		defer respRetry.Body.Close()
-
-		if resp.StatusCode == 200 {
-			return fs.FileInfoFromIndexdResponse(resp)
-		}
-	}
-
-	return nil, fs.HandleIndexdError(resp)
 }
 
 func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
@@ -594,8 +592,9 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 }
 
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
-	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID)
+	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID+"?expires_in=900")
 	FuseLog("GET " + requestUrl)
+	FuseLog(fmt.Sprintf("With token %v", fs.accessToken))
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
 	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
@@ -618,73 +617,72 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
-	FuseLog(bodyString)
 
 	var urlResponse presignedURLResponse
 	json.Unmarshal([]byte(bodyString), &urlResponse)
 	return urlResponse.Url
 }
 
-func (fs *Gen3Fuse) FetchBulkSizeResponseFromIndexd() (resp *http.Response, err error) {
-	requestUrl := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
-
+func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResponse, err error) {
+	requestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
 	var DIDsWithQuotes []string
-	for _, x := range fs.DIDs {
-		DIDsWithQuotes = append(DIDsWithQuotes, "\""+x+"\"")
-	}
-
-	postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
-
-	FuseLog("POST " + requestUrl) // + "\n" + postData)
-
-	// Decent timeout because there might be lots of files to list
-	timeout := time.Duration(60 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	req, err := http.NewRequest("POST", requestUrl, bytes.NewBuffer([]byte(postData)))
-	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		FuseLog(err.Error())
-		return nil, err
-	}
-	resp, err = client.Do(req)
-
-	if err != nil {
-		FuseLog(err.Error())
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-func (fs *Gen3Fuse) FileInfoFromIndexdResponse(resp *http.Response) (didToFileInfo map[string]*IndexdResponse, err error) {
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	bodyString := string(bodyBytes)
-
-	// FuseLog("Indexd response: " + bodyString)
-
-	didToFileInfoList := make([]IndexdResponse, 0)
-	json.Unmarshal([]byte(bodyString), &didToFileInfoList)
-
 	didToFileInfo = make(map[string]*IndexdResponse, 0)
-	for i := 0; i < len(didToFileInfoList); i++ {
-		didToFileInfo[didToFileInfoList[i].DID] = &IndexdResponse{
-			Filesize: didToFileInfoList[i].Filesize,
-			Filename: didToFileInfoList[i].Filename,
-			DID:      didToFileInfoList[i].DID,
-			URLs:     didToFileInfoList[i].URLs,
+	FuseLog(fmt.Sprintf("Getting %v records", len(fs.DIDs)))
+	for i := 0; i < len(fs.DIDs); i += 1000 {
+		last := i + 1000
+		if len(fs.DIDs) < last {
+			last = len(fs.DIDs)
 		}
-	}
+		DIDsWithQuotes = []string{}
+		for _, x := range fs.DIDs[i:last] {
+			DIDsWithQuotes = append(DIDsWithQuotes, "\""+x+"\"")
+		}
 
+		postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
+
+		FuseLog(fmt.Sprintf("POST %v with %v - %v records", requestURL, i, last))
+
+		// Decent timeout because there might be lots of files to list
+		timeout := time.Duration(60 * time.Second)
+		client := http.Client{
+			Timeout: timeout,
+		}
+
+		req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(postData)))
+		req.Header.Set("Content-Type", "application/json")
+
+		if err != nil {
+			FuseLog(err.Error())
+			return nil, err
+		}
+		resp, err := client.Do(req)
+
+		if err != nil {
+			FuseLog(err.Error())
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return nil, fs.HandleIndexdError(resp)
+
+		}
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyString := string(bodyBytes)
+
+		didToFileInfoList := make([]*IndexdResponse, 0)
+		json.Unmarshal([]byte(bodyString), &didToFileInfoList)
+
+		for _, i := range didToFileInfoList {
+			didToFileInfo[i.DID] = i
+		}
+
+	}
 	return didToFileInfo, nil
 }
 
-func FetchContentsAtURL(presignedUrl string, offset int64, size int64) (byteContents []byte, err error) {
-	FuseLog("\nGET " + presignedUrl)
+func FetchContentsAtURL(presignedUrl string, offset int64, size int64, fullsize int64) (byteContents []byte, err error) {
 
 	// Huge timeout because we're about to download a file
 	timeout := time.Duration(500 * time.Second)
@@ -692,12 +690,25 @@ func FetchContentsAtURL(presignedUrl string, offset int64, size int64) (byteCont
 		Timeout: timeout,
 	}
 	req, _ := http.NewRequest("GET", presignedUrl, nil)
+	last := offset + size
+	if last > fullsize {
+		last = fullsize
+	}
+	if last == offset {
+		return []byte{}, nil
+	}
 	if !(offset == 0 && size == 0) {
-		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+size))
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, last))
 	}
 	resp, err := client.Do(req)
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyString := string(bodyBytes)
+		FuseLog(bodyString)
+		return nil, &APIError{resp.StatusCode, presignedUrl}
+	}
 
-	// resp, err := http.Get(presignedUrl)
 	if err != nil {
 		FuseLog(err.Error())
 		return byteContents, err

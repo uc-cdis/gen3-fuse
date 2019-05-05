@@ -3,7 +3,6 @@ FenceAccessTokenPath: "/user/credentials/api/access_token"
 
 IndexdBulkFileInfoPath: "/index/bulk/documents"
 
-WTSFenceConnectPath: "/oauth2/authorization_url"
-WTSAccessTokenPath: "/token?expires=%d"
+WTSAccessTokenPath: "/token"
 
 LogFilePath: "fuse_log.txt"
