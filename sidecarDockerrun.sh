@@ -1,5 +1,7 @@
 #!/bin/bash
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
+python3 /go/src/github.com/uc-cdis/gen3-fuse/convert.py &
+
 while true; do
     if [ $(df /data/man* | wc -l) -lt 5 ]; then
         resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
