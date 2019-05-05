@@ -15,6 +15,8 @@ cleanup() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
+python3 /go/src/github.com/uc-cdis/gen3-fuse/convert.py &
+
 while true; do
     if [ $(df /data/man* | sed '1d' | wc -l) -lt 7 ]; then # remove header line, and also consider the existence of manifest snyc log
         resp=`curl http://manifestservice-service.$NAMESPACE/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
