@@ -16,6 +16,12 @@ def merge():
     if os.path.isfile(manifest+'.sync'):
         print("already converted")
         return
+    
+    output_tsv_folder = os.path.join('/data', '{}_tsv'.format(manifest))
+
+    if not os.path.isdir(output_tsv_folder):
+        os.mkdir(output_tsv_folder)
+
     print('getting latest manifest')    
     print(path)
     for tbl_name in ['ActionableMutations', 'ICDCode', 'Oncology_Primary', 'Patients']:
@@ -26,7 +32,7 @@ def merge():
         
         filenames = glob.glob(os.path.join(path, tbl_name, '*.tsv'))
 
-        with open(os.path.join('/data', '{}.tsv'.format(tbl_name)), 'w') as outfile:
+        with open(os.path.join(output_tsv_folder, '{}.tsv'.format(tbl_name)), 'w') as outfile:
             with ProcessPoolExecutor(max_workers=10) as pool:
                 result = pool.map(readfile, filenames)
                 count = 0
