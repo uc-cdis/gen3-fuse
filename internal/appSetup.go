@@ -64,12 +64,10 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		FSName:                  "gen3fuse",
 		ErrorLogger:             nil,
 		DisableWritebackCaching: true,
+                ReadOnly: true,
                 Options: map[string]string{},
 	}
-        fmt.Printf("Options are %v\n", mountCfg.ToOptionsString())
 	mountCfg.Options["allow_other"] = ""
-        // fmt.Printf("Options are %v\n", mountCfg.ToOptionsString()) 
-        FuseLog(fmt.Sprintf("Options are %v\n", mountCfg.ToOptionsString()))
         
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
