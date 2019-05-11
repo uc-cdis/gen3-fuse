@@ -116,7 +116,7 @@ func callMount(
 	// buffer.
 	cmd := exec.Command(
 		bin,
-		"-o", cfg.toOptionsString(),
+		"-o", cfg.ToOptionsString(),
 		// Tell osxfuse-kext how large our buffer is. It must split
 		// writes larger than this into multiple writes.
 		//
