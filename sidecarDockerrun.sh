@@ -1,5 +1,6 @@
 #!/bin/bash
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
+trap "killall gen3-fuse; cd /data; for f in */; do fusermount -uz $f; rm -rf $f; done; exit 0" SIGTERM
 while true; do
     if [ $(df /data/man* | wc -l) -lt 5 ]; then
         resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
