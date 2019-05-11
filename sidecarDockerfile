@@ -6,7 +6,7 @@ RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 ADD . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
-RUN mv config.yaml /home/jovyan/fuse-config.yaml
-RUN mv sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
+RUN mv config.yaml /root/fuse-config.yaml
+RUN mv sidecarDockerrun.sh /root/sidecarDockerrun.sh
 RUN mv gen3-fuse /usr/local/bin/gen3-fuse
 CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
