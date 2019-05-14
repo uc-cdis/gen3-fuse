@@ -51,8 +51,6 @@ RUN mkdir -p /opt && \
     cp -a --parents /usr/bin/killall /opt && \
     cp -a --parents /bin/fusermount /opt
 
-RUN ldd /bin/bash
-RUN echo $GOPATH
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 COPY . .
