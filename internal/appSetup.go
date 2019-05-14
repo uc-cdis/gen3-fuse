@@ -101,7 +101,7 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 		var wg sync.WaitGroup
 		waitForSignal(&wg)
 
-		daemonCtx := new(daemon.Context)
+		daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
 		child, err = daemonCtx.Reborn()
 
 		if err != nil {
