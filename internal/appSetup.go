@@ -64,15 +64,13 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		FSName:                  "gen3fuse",
 		ErrorLogger:             nil,
 		DisableWritebackCaching: true,
-                ReadOnly: true,
-                Options: map[string]string{},
+		ReadOnly: true,
+		Options: map[string]string{},
 	}
 	mountCfg.Options["allow_other"] = ""
         
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
-                FuseLog(fmt.Sprintf("Mount error: %v\n", err))
-                fmt.Printf("Mount Error: %v\n", err)
 		return
 	}
 

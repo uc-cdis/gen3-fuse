@@ -728,6 +728,10 @@ func FetchContentsAtURL(presignedUrl string, offset int64, size int64, fullsize 
 }
 
 func FuseLog(message string) {
+
+        // Log messages to stdout too
+        fmt.Println(message)
+
 	file, err := os.OpenFile(LogFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0664)
 	if err != nil {
 		return

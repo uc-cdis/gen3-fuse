@@ -39,7 +39,7 @@ func mount(
 
 	cmd := exec.Command(
 		"fusermount",
-		"-o", cfg.ToOptionsString(),
+		"-o", cfg.toOptionsString(),
 		"--",
 		dir,
 	)
