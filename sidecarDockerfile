@@ -8,6 +8,7 @@ WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 ADD . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
 RUN mv config.yaml /home/jovyan/fuse-config.yaml
+RUN cp sidecarDockerrun.sh /sidecarDockerrun.sh
 RUN mv sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
 RUN mv gen3-fuse /usr/local/bin/gen3-fuse
 USER jovyan
