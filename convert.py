@@ -48,11 +48,11 @@ def merge():
                 for r in result:
                     if count % 100 == 0:
                         print("Processed {} {}".format(count, tbl_name))
-                    count += 1
                     if not count:
                         outfile.writelines(r)
                     else:
                         outfile.writelines(r[1:])
+                    count += 1
     with open(manifest + ".sync", "w") as f:
         f.write("Done")
 
