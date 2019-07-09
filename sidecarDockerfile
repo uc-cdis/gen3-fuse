@@ -1,69 +1,13 @@
-FROM golang:1.12 as build-deps
+FROM golang:1.12-alpine
 
-RUN apt-get update && apt-get install -y fuse curl jq psmisc && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libjq.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libselinux.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libcurl.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libonig.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libpcre.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libz.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libnghttp2.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libidn2.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/librtmp.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libssh2.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libpsl.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libssl.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libcrypto.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libkrb5.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libk5crypto.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libcom_err.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/liblber-2.4.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libldap_r-2.4.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libunistring.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libgnutls.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libhogweed.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libnettle.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libgmp.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libgcrypt.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libdl.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libkrb5support.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libkeyutils.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libresolv.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libsasl2.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libp11-kit.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libidn.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libtasn1.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libgpg-error.so.* /opt && \
-    cp -a --parents /usr/lib/x86_64-linux-gnu/libffi.so.* /opt && \
-    cp -a --parents /lib/x86_64-linux-gnu/libtinfo.so.* /opt && \
-    cp -a --parents /bin/rm /opt && \
-    cp -aL --parents /bin/bash /opt && \
-    cp -a --parents /bin/df /opt && \
-    cp -a --parents /bin/ls /opt && \
-    cp -a --parents /usr/bin/wc /opt && \
-    cp -a --parents /usr/bin/jq /opt && \
-    cp -a --parents /bin/sleep /opt && \
-    cp -a --parents /bin/sed /opt && \
-    cp -a --parents /usr/bin/curl /opt && \
-    cp -a --parents /usr/bin/killall /opt && \
-    cp -a --parents /bin/fusermount /opt
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 COPY . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
 
-
-
-
-FROM gcr.io/distroless/base
-
-
-COPY --from=build-deps /opt /
-COPY --from=build-deps /go/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
+RUN mv /go/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
 COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh
