@@ -127,6 +127,5 @@ func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, 
 		FuseLog(fmt.Sprintf("WTS returned %s, error %v\n", tokenResponse, err.Error()))
 		return "", errors.New("Error obtaining access token from the workspace token service at " + requestUrl + ". " + err.Error())
 	}
-	FuseLog(fmt.Sprintf("Get access token %v", tokenResponse.Token))
 	return tokenResponse.Token, nil
 }

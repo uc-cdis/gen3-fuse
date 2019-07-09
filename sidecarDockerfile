@@ -1,14 +1,16 @@
 FROM golang:1.12-alpine
 
 RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash
-RUN adduser jovyan -u 1000 -G users -D
-RUN echo $GOPATH
+
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
-ADD . .
+COPY . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
-RUN mv config.yaml /home/jovyan/fuse-config.yaml
-RUN mv sidecarDockerrun.sh /home/jovyan/sidecarDockerrun.sh
-RUN mv gen3-fuse /usr/local/bin/gen3-fuse
-USER jovyan
-CMD [ "/bin/sh", "/usr/local/gen3/sidecarDockerrun.sh"]
+
+RUN mv /go/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
+
+COPY config.yaml /fuse-config.yaml
+COPY sidecarDockerrun.sh /sidecarDockerrun.sh
+
+ENV HOME=/
+CMD [ "/bin/bash", "/sidecarDockerrun.sh"]

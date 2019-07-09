@@ -64,8 +64,11 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		FSName:                  "gen3fuse",
 		ErrorLogger:             nil,
 		DisableWritebackCaching: true,
+		ReadOnly: true,
+		Options: map[string]string{},
 	}
-
+	mountCfg.Options["allow_other"] = ""
+        
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
 		return
@@ -98,7 +101,7 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 		var wg sync.WaitGroup
 		waitForSignal(&wg)
 
-		daemonCtx := new(daemon.Context)
+		daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
 		child, err = daemonCtx.Reborn()
 
 		if err != nil {

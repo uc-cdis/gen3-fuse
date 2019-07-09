@@ -1,5 +1,19 @@
 #!/bin/bash
+cleanup() {
+  killall gen3-fuse
+  cd /data
+  for f in `ls -d`
+  do
+    echo a $f b `pwd`
+    fusermount -uz $f
+    rm -rf $f
+  done
+
+  exit 0
+}
+
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
+trap cleanup SIGTERM
 while true; do
     if [ $(df /data/man* | wc -l) -lt 5 ]; then
         resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
@@ -17,7 +31,7 @@ while true; do
         if [ ! -d /data/$FILENAME ]; then
             echo mount manifest $MANIFESTEXT
             curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > ~/manifest.json
-            gen3-fuse ~/fuse-config.yaml ~/manifest.json /data/$FILENAME https://$HOSTNAME http://workspace-token-service.$NAMESPACE
+            gen3-fuse ~/fuse-config.yaml ~/manifest.json /data/$FILENAME https://$HOSTNAME http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
         fi
     else
         OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
