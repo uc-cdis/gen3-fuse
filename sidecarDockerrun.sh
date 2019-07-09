@@ -39,8 +39,12 @@ while true; do
         fi
     else
         OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
-        echo unmount old manifest $OLDDIR
-        fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
+        if [ ! -z "$OLDDIR" ]; then
+            echo unmount old manifest $OLDDIR
+            fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
+        else
+            echo "[WARNING] Empty $OLDDIR"
+        fi
     fi
     sleep 10
 done
