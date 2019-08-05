@@ -114,7 +114,7 @@ func getFilePathFromURL(urls []string) (result []string, ok bool) {
 	validURL := ""
 	for _, uri := range urls {
 		parsed, err := url.Parse(uri)
-		if err == nil && (parsed.Scheme == "s3" || parsed.Scheme == "gcs") {
+		if err == nil && (parsed.Scheme == "s3" || parsed.Scheme == "gcs" || parsed.Scheme == "http" || parsed.Scheme == "https") {
 			validURL = uri
 			break
 		}
