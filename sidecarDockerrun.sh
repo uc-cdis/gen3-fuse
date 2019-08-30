@@ -15,6 +15,10 @@ cleanup() {
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
 while true; do
+    echo blabla
+    df /data/man*
+    df /data/man* | sed '1d'
+    df /data/man* | sed '1d' | wc -l
     if [ $(df /data/man* | sed '1d' | wc -l) -lt 7 ]; then # remove header line, and also consider the existence of manifest snyc log
         resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
         if [[ $(echo $resp | jq -r '.error') =~ 'log' ]]; then
