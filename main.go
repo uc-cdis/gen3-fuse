@@ -18,9 +18,8 @@ func main() {
 
 	flag.Parse()
 
-	/*
-		if len(os.Args) < 6 {
-			fmt.Fprintln(os.Stderr, `Error: incorrect number of args.
+	if len(os.Args) < 6 {
+		fmt.Fprintln(os.Stderr, `Error: incorrect number of args.
 				Usage:
 				gen3fuse \
 				-config=<path_to_config> \
@@ -29,9 +28,8 @@ func main() {
 				-hostname=<commons_domain> \
 				-wtsURL=<workspace_token_service_url> \
 				-api-key=<api_key>`)
-			os.Exit(1)
-		}
-	*/
+		os.Exit(1)
+	}
 
 	// at least one of [apiKey, wtsURL] must be provided
 	// so that gen3-fuse can retrieve access tokens
