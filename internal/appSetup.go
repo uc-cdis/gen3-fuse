@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 
 	daemon "github.com/sevlyar/go-daemon"
@@ -64,11 +63,11 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		FSName:                  "gen3fuse",
 		ErrorLogger:             nil,
 		DisableWritebackCaching: true,
-		ReadOnly: true,
-		Options: map[string]string{},
+		ReadOnly:                true,
+		Options:                 map[string]string{},
 	}
 	mountCfg.Options["allow_other"] = ""
-        
+
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
 		return
@@ -90,60 +89,55 @@ func Unmount(mountPoint string) (err error) {
 }
 
 func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoint string) {
-	app := cli.NewApp()
 	var child *os.Process
+	var err error
 
-	app.Action = func(c *cli.Context) (err error) {
-		defer func() {
-			time.Sleep(time.Second)
-		}()
+	defer func() {
+		time.Sleep(time.Second)
+	}()
 
-		var wg sync.WaitGroup
-		waitForSignal(&wg)
+	var wg sync.WaitGroup
+	waitForSignal(&wg)
 
-		daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
-		child, err = daemonCtx.Reborn()
+	daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
+	child, err = daemonCtx.Reborn()
 
-		if err != nil {
-			panic(fmt.Sprintf("unable to daemonize: %v", err))
-		}
-
-		if child != nil {
-			// attempt to wait for child to notify parent
-			wg.Wait()
-			if waitedForSignal == syscall.SIGUSR1 {
-				return
-			}
-			return fuse.EINVAL
-		}
-		// kill our own waiting goroutine
-		kill(os.Getpid(), syscall.SIGUSR1)
-		wg.Wait()
-		defer daemonCtx.Release()
-
-		// Mount the file system.
-		var mfs *fuse.MountedFileSystem
-		ctx := context.Background()
-
-		_, mfs, err = Mount(ctx, mountPoint, gen3FuseConfig, manifestURL)
-
-		if err != nil {
-			kill(os.Getppid(), syscall.SIGUSR2)
-			FuseLog("Mounting file system: " + err.Error())
-		} else {
-			kill(os.Getppid(), syscall.SIGUSR1)
-
-			// Wait for the file system to be unmounted.
-			err = mfs.Join(context.Background())
-			if err != nil {
-				err = fmt.Errorf("MountedFileSystem.Join: %v", err)
-				return
-			}
-		}
-		return
+	if err != nil {
+		panic(fmt.Sprintf("unable to daemonize: %v", err))
 	}
 
-	err := app.Run(os.Args)
+	if child != nil {
+		// attempt to wait for child to notify parent
+		wg.Wait()
+		if waitedForSignal == syscall.SIGUSR1 {
+			return
+		}
+		err = fuse.EINVAL
+	}
+	// kill our own waiting goroutine
+	kill(os.Getpid(), syscall.SIGUSR1)
+	wg.Wait()
+	defer daemonCtx.Release()
+
+	// Mount the file system.
+	var mfs *fuse.MountedFileSystem
+	ctx := context.Background()
+
+	_, mfs, err = Mount(ctx, mountPoint, gen3FuseConfig, manifestURL)
+
+	if err != nil {
+		kill(os.Getppid(), syscall.SIGUSR2)
+		FuseLog("Mounting file system: " + err.Error())
+	} else {
+		kill(os.Getppid(), syscall.SIGUSR1)
+
+		// Wait for the file system to be unmounted.
+		err = mfs.Join(context.Background())
+		if err != nil {
+			err = fmt.Errorf("MountedFileSystem.Join: %v", err)
+			return
+		}
+	}
 
 	if err != nil {
 		FuseLog(err.Error())
