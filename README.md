@@ -44,7 +44,7 @@ You can choose where errors are logged in the yaml config file. By default they 
     go build
 
     # Run (note the fields you need to fill in)
-    ./gen3fuse \
+    ./gen3-fuse \
     -config=<path_to_config> \
     -manifest=<path_to_manifest> \
     -mount-point=<directory_to_mount> \
