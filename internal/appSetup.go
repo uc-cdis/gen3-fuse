@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 
 	daemon "github.com/sevlyar/go-daemon"
@@ -63,11 +64,11 @@ func Mount(ctx context.Context, mountPoint string, gen3FuseConfig *Gen3FuseConfi
 		FSName:                  "gen3fuse",
 		ErrorLogger:             nil,
 		DisableWritebackCaching: true,
-		ReadOnly:                true,
-		Options:                 map[string]string{},
+		ReadOnly: true,
+		Options: map[string]string{},
 	}
 	mountCfg.Options["allow_other"] = ""
-
+        
 	mfs, err = fuse.Mount(mountPoint, server, mountCfg)
 	if err != nil {
 		return
@@ -89,9 +90,10 @@ func Unmount(mountPoint string) (err error) {
 }
 
 func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoint string) {
+	app := cli.NewApp()
 	var child *os.Process
 
-	f := func() (err error) {
+	app.Action = func(c *cli.Context) (err error) {
 		defer func() {
 			time.Sleep(time.Second)
 		}()
@@ -141,7 +143,7 @@ func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoin
 		return
 	}
 
-	err := f()
+	err := app.Run(os.Args)
 
 	if err != nil {
 		FuseLog(err.Error())
