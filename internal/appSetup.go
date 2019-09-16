@@ -90,54 +90,58 @@ func Unmount(mountPoint string) (err error) {
 
 func InitializeApp(gen3FuseConfig *Gen3FuseConfig, manifestURL string, mountPoint string) {
 	var child *os.Process
-	var err error
 
-	defer func() {
-		time.Sleep(time.Second)
-	}()
+	f := func() (err error) {
+		defer func() {
+			time.Sleep(time.Second)
+		}()
 
-	var wg sync.WaitGroup
-	waitForSignal(&wg)
+		var wg sync.WaitGroup
+		waitForSignal(&wg)
 
-	daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
-	child, err = daemonCtx.Reborn()
+		daemonCtx := daemon.Context{LogFileName: "/dev/stdout"}
+		child, err = daemonCtx.Reborn()
 
-	if err != nil {
-		panic(fmt.Sprintf("unable to daemonize: %v", err))
-	}
-
-	if child != nil {
-		// attempt to wait for child to notify parent
-		wg.Wait()
-		if waitedForSignal == syscall.SIGUSR1 {
-			return
-		}
-		err = fuse.EINVAL
-	}
-	// kill our own waiting goroutine
-	kill(os.Getpid(), syscall.SIGUSR1)
-	wg.Wait()
-	defer daemonCtx.Release()
-
-	// Mount the file system.
-	var mfs *fuse.MountedFileSystem
-	ctx := context.Background()
-
-	_, mfs, err = Mount(ctx, mountPoint, gen3FuseConfig, manifestURL)
-
-	if err != nil {
-		kill(os.Getppid(), syscall.SIGUSR2)
-		FuseLog("Mounting file system: " + err.Error())
-	} else {
-		kill(os.Getppid(), syscall.SIGUSR1)
-
-		// Wait for the file system to be unmounted.
-		err = mfs.Join(context.Background())
 		if err != nil {
-			err = fmt.Errorf("MountedFileSystem.Join: %v", err)
-			return
+			panic(fmt.Sprintf("unable to daemonize: %v", err))
 		}
+
+		if child != nil {
+			// attempt to wait for child to notify parent
+			wg.Wait()
+			if waitedForSignal == syscall.SIGUSR1 {
+				return
+			}
+			return fuse.EINVAL
+		}
+		// kill our own waiting goroutine
+		kill(os.Getpid(), syscall.SIGUSR1)
+		wg.Wait()
+		defer daemonCtx.Release()
+
+		// Mount the file system.
+		var mfs *fuse.MountedFileSystem
+		ctx := context.Background()
+
+		_, mfs, err = Mount(ctx, mountPoint, gen3FuseConfig, manifestURL)
+
+		if err != nil {
+			kill(os.Getppid(), syscall.SIGUSR2)
+			FuseLog("Mounting file system: " + err.Error())
+		} else {
+			kill(os.Getppid(), syscall.SIGUSR1)
+
+			// Wait for the file system to be unmounted.
+			err = mfs.Join(context.Background())
+			if err != nil {
+				err = fmt.Errorf("MountedFileSystem.Join: %v", err)
+				return
+			}
+		}
+		return
 	}
+
+	err := f()
 
 	if err != nil {
 		FuseLog(err.Error())
