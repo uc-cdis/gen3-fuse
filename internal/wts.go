@@ -84,10 +84,12 @@ func getJson(url string, target interface{}) (err error) {
 }
 
 func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
+	// api key takes precedence
 	if gen3FuseConfig.ApiKey != "" {
 		return GetAccessTokenWithApiKey(gen3FuseConfig)
 	}
 
+	// only consult WTS if no api key provided
 	return GetAccessTokenFromWTS(gen3FuseConfig)
 }
 

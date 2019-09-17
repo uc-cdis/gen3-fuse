@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -8,49 +9,64 @@ import (
 )
 
 func main() {
+	configFileName := flag.String("config", "", "path to config")
+	manifestFilePath := flag.String("manifest", "", "path to manifest")
+	mountPoint := flag.String("mount-point", "", "directory to mount")
+	hostname := flag.String("hostname", "", "commons domain")
+	wtsURL := flag.String("wtsURL", "", "workspace-token-service url")
+	apiKey := flag.String("api-key", "", "api key")
+
+	flag.Parse()
+
 	if len(os.Args) < 6 {
-		fmt.Fprintf(os.Stderr, "Error: incorrect number of args. \nUsage: gen3fuse  <path to config yaml file> <path to manifest json file> <directory to mount> <hostname> <workspace token service url> [<api key>]\n")
+		fmt.Fprintln(os.Stderr, `Error: incorrect number of args.
+				Usage:
+				gen3-fuse \
+				-config=<path_to_config> \
+				-manifest=<path_to_manifest> \
+				-mount-point=<directory_to_mount> \
+				-hostname=<commons_domain> \
+				-wtsURL=<workspace_token_service_url> \
+				-api-key=<api_key>`)
 		os.Exit(1)
 	}
 
-	configFileName := os.Args[1]
-	manifestFilePath := os.Args[2]
-	mountPoint := os.Args[3]
-	hostname := os.Args[4]
-	wtsURL := os.Args[5]
-	apiKey := ""
-	if len(os.Args) == 7 {
-		apiKey = os.Args[6]
+	// at least one of [apiKey, wtsURL] must be provided
+	// apiKey takes precedence if both apiKey and wtsURL provided
+	// apiKey only used in the case of testing/using gen3fuse locally
+	if *wtsURL == "" && *apiKey == "" {
+		fmt.Fprint(os.Stderr, "Neither api key nor workspace-token-service url provided. Exiting gen3-fuse.\n")
+		os.Exit(1)
 	}
 
-	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
+	if _, err := os.Stat(*configFileName); os.IsNotExist(err) {
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "The config yaml file argument provided at %s does not exist. Exiting Gen3Fuse.\n", configFileName)
+			fmt.Fprintf(os.Stderr, "The config yaml file argument provided at %s does not exist. Exiting gen3-fuse.\n", *configFileName)
 			os.Exit(1)
 		}
 	}
 
-	gen3fuse.Unmount(mountPoint)
+	gen3fuse.Unmount(*mountPoint)
 
-	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
-		os.Mkdir(mountPoint, 0777)
+	if _, err := os.Stat(*mountPoint); os.IsNotExist(err) {
+		os.Mkdir(*mountPoint, 0777)
 	}
 
-	if _, err := os.Stat(manifestFilePath); os.IsNotExist(err) {
+	if _, err := os.Stat(*manifestFilePath); os.IsNotExist(err) {
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "The manifest file path provided at %s does not exist. Exiting Gen3Fuse.\n", manifestFilePath)
+			fmt.Fprintf(os.Stderr, "The manifest file path provided at %s does not exist. Exiting Gen3Fuse.\n", *manifestFilePath)
 			os.Exit(1)
 		}
 	}
 
-	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml(configFileName)
+	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml(*configFileName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing yaml from %s: %s\n", configFileName, err.Error())
+		fmt.Fprintf(os.Stderr, "Error parsing yaml from %s: %s\n", *configFileName, err.Error())
 		os.Exit(1)
 	}
-	gen3FuseConfig.Hostname = hostname
-	gen3FuseConfig.WTSBaseURL = wtsURL
-	gen3FuseConfig.ApiKey = apiKey
+	gen3FuseConfig.Hostname = *hostname
+	gen3FuseConfig.WTSBaseURL = *wtsURL
+	gen3FuseConfig.ApiKey = *apiKey
 
-	gen3fuse.InitializeApp(gen3FuseConfig, manifestFilePath, mountPoint)
+	gen3fuse.InitializeApp(gen3FuseConfig, *manifestFilePath, *mountPoint)
 }

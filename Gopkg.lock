@@ -2,16 +2,24 @@
 
 
 [[projects]]
-  digest = "1:d5f97fc268267ec1b61c3453058c738246fc3e746f14b1ae25161513b7367b0c"
+  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  pruneopts = "UT"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:cbec35fe4d5a4fba369a656a8cd65e244ea2c743007d8f6c1ccb132acf9d1296"
   name = "github.com/gorilla/mux"
   packages = ["."]
   pruneopts = "UT"
-  revision = "c5c6c98bc25355028a63748a498942a6398ccd22"
-  version = "v1.7.1"
+  revision = "00bdffe0f3c77e27d2cf6f5c70232a2d3e4d9c15"
+  version = "v1.7.3"
 
 [[projects]]
   branch = "master"
-  digest = "1:c19183ee1bc01433c61d026972e83a479816ffb00f29c8d7605b0668d4bdea8c"
+  digest = "1:6ca849d857f1d00a58a0db595c340c21cd6b0520923f60ff1f113ffaef33daa0"
   name = "github.com/jacobsa/fuse"
   packages = [
     ".",
@@ -22,7 +30,7 @@
     "internal/fusekernel",
   ]
   pruneopts = "UT"
-  revision = "cd3959611bcb6bb23d49f1598d98f2bf44476805"
+  revision = "fbd48a3771756e57a717a8015446ecb87ac9d536"
 
 [[projects]]
   branch = "master"
@@ -33,20 +41,28 @@
   revision = "2bc1f35cddc0cc527b4bc3dce8578fc2a6c11384"
 
 [[projects]]
-  digest = "1:ed369adf65d9c0c400885c0f257e4f39e9ce568d23145763ff1a552e3f10e89b"
+  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  pruneopts = "UT"
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:1ad7be70615b095707f558f510013198d24e26f99f5319a38c2039de46576945"
   name = "github.com/sevlyar/go-daemon"
   packages = ["."]
   pruneopts = "UT"
-  revision = "f9261e73885de99b1647d68bedadf2b9a99ad11f"
-  version = "v0.1.4"
+  revision = "bf839693b97cb19a587b25649bbcb59ee16bdb2f"
+  version = "v0.1.5"
 
 [[projects]]
-  digest = "1:b24d38b282bacf9791408a080f606370efa3d364e4b5fd9ba0f7b87786d3b679"
-  name = "github.com/urfave/cli"
-  packages = ["."]
+  digest = "1:8548c309c65a85933a625be5e7d52b6ac927ca30c56869fae58123b8a77a75e1"
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
   pruneopts = "UT"
-  revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
-  version = "v1.20.0"
+  revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
+  version = "v1.4.0"
 
 [[projects]]
   branch = "master"
@@ -54,7 +70,15 @@
   name = "golang.org/x/net"
   packages = ["context"]
   pruneopts = "UT"
-  revision = "1da14a5a36f220ea3f03470682b737b1dfd5de22"
+  revision = "c8589233b77dde5edd2205ba8a4fb5c9c2472556"
+
+[[projects]]
+  branch = "master"
+  digest = "1:ec9d9815894f067c7878330735b9e4dfa6dc61234d2ba136b60a1436d6b5ea94"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  pruneopts = "UT"
+  revision = "b4ddaad3f8a36719f2b8bc6486c14cc468ca2bb5"
 
 [[projects]]
   digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
@@ -73,7 +97,7 @@
     "github.com/jacobsa/fuse/fuseops",
     "github.com/jacobsa/fuse/fuseutil",
     "github.com/sevlyar/go-daemon",
-    "github.com/urfave/cli",
+    "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",
   ]
