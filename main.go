@@ -21,7 +21,7 @@ func main() {
 	if len(os.Args) < 6 {
 		fmt.Fprintln(os.Stderr, `Error: incorrect number of args.
 				Usage:
-				gen3fuse \
+				gen3-fuse \
 				-config=<path_to_config> \
 				-manifest=<path_to_manifest> \
 				-mount-point=<directory_to_mount> \
