@@ -32,8 +32,8 @@ func main() {
 	}
 
 	// at least one of [apiKey, wtsURL] must be provided
-	// so that gen3-fuse can retrieve access tokens
 	// apiKey takes precedence if both apiKey and wtsURL provided
+	// apiKey only used in the case of testing/using gen3fuse locally
 	if *wtsURL == "" && *apiKey == "" {
 		fmt.Fprint(os.Stderr, "Neither api key nor workspace-token-service url provided. Exiting gen3-fuse.\n")
 		os.Exit(1)
