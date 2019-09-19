@@ -13,9 +13,16 @@ gen3-fuse \ # okay
 -wtsURL=http://workspace-token-service.$GEN3_NAMESPACE \ # okay
 >/proc/1/fd/1 2>/proc/1/fd/2
 
+echo "here is the mounted directory:"
+ls -R /$COMMONS_DATA
+
 # $ENGINE_WORKSPACE
 while [[ ! -f /$ENGINE_WORKSPACE/done ]]; do
   echo "not done"
 done
 
-fusermount -u /$ENGINE_WORKSPACE
+echo "done, unmounting gen3fuse"
+
+fusermount -u /$COMMONS_DATA
+
+echo "gen3fuse exited successfully"
