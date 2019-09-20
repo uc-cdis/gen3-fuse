@@ -5,12 +5,12 @@
 # Q. What if the manifest is hella big?
 echo $GEN3FUSE_MANIFEST > ~/manifest.json
 
-gen3-fuse \ # okay
--config=~/fuse-config.yaml \ # okay
--manifest=~/manifest.json \ # okay
--mount-point=/$COMMONS_DATA \ # okay
--hostname=https://$HOSTNAME \ # okay
--wtsURL=http://workspace-token-service.$GEN3_NAMESPACE \ # okay
+gen3-fuse \
+-config=~/fuse-config.yaml \
+-manifest=~/manifest.json \
+-mount-point=/$COMMONS_DATA \
+-hostname=https://$HOSTNAME \
+-wtsURL=http://workspace-token-service.$GEN3_NAMESPACE \
 >/proc/1/fd/1 2>/proc/1/fd/2
 
 echo "here is the mounted directory:"
