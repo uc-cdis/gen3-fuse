@@ -9,8 +9,8 @@ echo $GEN3FUSE_MANIFEST > /manifest.json
 
 echo "running gen3-fuse.."
 gen3-fuse \
--config=fuse-config.yaml \
--manifest=manifest.json \
+-config=/fuse-config.yaml \
+-manifest=/manifest.json \
 -mount-point=/$COMMONS_DATA \
 -hostname=https://$HOSTNAME \
 -wtsURL=http://workspace-token-service.$GEN3_NAMESPACE
