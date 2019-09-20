@@ -4,8 +4,6 @@ gen3-fuse is a FUSE implementation built on [jacobsa/fuse](https://github.com/ja
 
 When Gen3Fuse runs in the workspace, we use the [Workspace Token Service](https://github.com/uc-cdis/workspace-token-service) to login to [Fence](https://github.com/uc-cdis/fence), which provides temporary signed URLs to access files stored in s3. This allows the end-user to natively browse files stored in s3 without access to AWS credentials.  
 
-In environments other than workspace Gen3Fuse works with an apiKey and does not consult the workspace-token-service.
-
 ## Overview
 
 The gen3fuse program is initialized with a manifest file from a Gen3 Data Commons and a mount point. The Workspace Token Service authenticates the worker node by checking Kubernetes annotations on the machine. Access tokens can then be retrieved from the WTS for use with Fence to obtain presigned URLs.
@@ -54,12 +52,8 @@ You can choose where errors are logged in the yaml config file. By default they 
 
 Note the usage of the program above. All arguments are required except `wtsURL` and `api-key`. 
 You must provide at least one of `wtsURL` or `api-key` in order for Gen3Fuse to work, 
-because Gen3Fuse must obtain access tokens using one of those methods.
-If both arguments are provided, then the `api-key` takes precedence and Gen3Fuse gets a token 
-directly from fence and does not consult the workspace-token-service.
-To be clear, Gen3Fuse does not in general depend on the workspace-token-service to run.
-When Gen3Fuse is running in the workspace, it will use the workspace-token-service.
-In any other environment, it is sufficient to provide an `api-key`, and Gen3Fuse will work.  
+because Gen3Fuse must obtain access tokens using one of those methods. The only reason you would
+ever pass `api-key` instead of `wtsURL` is for testing locally.
 
 You provide the yaml configuration file on the command line. In the repo, there are example yaml configs already completed.
 For a Kubernetes deployment into a Jupyter pod, config.yaml may be appropriate. To run Gen3Fuse on your own computer, local-config.yaml might be useful.
