@@ -26,7 +26,7 @@ if [ $MARINER_COMPONENT == "ENGINE" ]; then
   done
 else
   echo "waiting for task to finish.."
-  while [[ ! -f $TOOL_WORKING_DIR\done ]]; do
+  while [[ ! -f $TOOL_WORKING_DIR/done ]]; do
     :
   done
 fi
