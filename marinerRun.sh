@@ -13,8 +13,7 @@ gen3-fuse \
 -manifest=/manifest.json \
 -mount-point=/$COMMONS_DATA \
 -hostname=https://$HOSTNAME \
--wtsURL=http://workspace-token-service.$GEN3_NAMESPACE
-# >/proc/1/fd/1 2>/proc/1/fd/2 # uncomment after testing
+-wtsURL=http://workspace-token-service.$GEN3_NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
 
 echo "here is the mounted directory:"
 ls -R /$COMMONS_DATA
