@@ -7,11 +7,13 @@ echo "writing manifest"
 echo $GEN3FUSE_MANIFEST
 echo $GEN3FUSE_MANIFEST > /manifest.json
 
+
+
 echo "running gen3-fuse.."
 gen3-fuse \
 -config=/fuse-config.yaml \
 -manifest=/manifest.json \
--mount-point=/$COMMONS_DATA \
+-mount-point=/$COMMONS_DATA/data \
 -hostname=https://$HOSTNAME \
 -wtsURL=http://workspace-token-service.$GEN3_NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
 
