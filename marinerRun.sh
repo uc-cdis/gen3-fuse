@@ -22,7 +22,7 @@ ls -R /$COMMONS_DATA
 
 if [ $MARINER_COMPONENT == "ENGINE" ]; then
   echo "waiting for engine to finish.."
-  while [[ ! -f /$ENGINE_WORKSPACE/done ]]; do
+  while [[ ! -f /$ENGINE_WORKSPACE/workflowRuns/$RUN_ID/done ]]; do
     :
   done
 else
