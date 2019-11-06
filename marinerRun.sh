@@ -20,7 +20,7 @@ gen3-fuse \
 echo "here is the mounted directory:"
 ls -R /$COMMONS_DATA
 
-if [ $MARINER_COMPONENT == "ENGINE" ]; then
+if [ $MARINER_COMPONENT == "engine" ]; then
   echo "waiting for engine to finish.."
   while [[ ! -f /$ENGINE_WORKSPACE/workflowRuns/$RUN_ID/done ]]; do
     :
