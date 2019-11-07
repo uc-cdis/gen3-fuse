@@ -2,7 +2,7 @@
 
 cleanup() {
   killall gen3-fuse
-  cd /$COMMONS_DATA/data
+  cd /$COMMONS_DATA
   for f in `ls -d`
   do
     echo a $f b `pwd`
