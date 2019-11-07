@@ -2,14 +2,7 @@
 
 cleanup() {
   killall gen3-fuse
-  cd /$COMMONS_DATA
-  for f in `ls -d`
-  do
-    echo a $f b `pwd`
-    fusermount -uz $f
-    rm -rf $f
-  done
-
+  fusermount -uz /$COMMONS_DATA/data
   exit 0
 }
 
