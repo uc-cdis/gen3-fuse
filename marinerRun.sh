@@ -1,13 +1,24 @@
 #!/bin/bash
 
+cleanup() {
+  killall gen3-fuse
+  cd /$COMMONS_DATA/data
+  for f in `ls -d`
+  do
+    echo a $f b `pwd`
+    fusermount -uz $f
+    rm -rf $f
+  done
+
+  exit 0
+}
+
 # maybe use a more vertically scalable method
 # than passing manifest via environment variable
-# Q. What if the manifest is hella big?
+# Q. What if the manifest is very big?
 echo "writing manifest"
 echo $GEN3FUSE_MANIFEST
 echo $GEN3FUSE_MANIFEST > /manifest.json
-
-
 
 echo "running gen3-fuse.."
 /gen3-fuse \
@@ -20,6 +31,7 @@ echo "running gen3-fuse.."
 echo "here is the mounted directory:"
 ls -R /$COMMONS_DATA
 
+trap cleanup SIGTERM
 if [ $MARINER_COMPONENT == "engine" ]; then
   echo "waiting for engine to finish.."
   while [[ ! -f /$ENGINE_WORKSPACE/workflowRuns/$RUN_ID/done ]]; do
@@ -34,6 +46,7 @@ fi
 
 echo "done, unmounting gen3fuse"
 
-fusermount -u /$COMMONS_DATA
+cleanup
+# fusermount -u  /$COMMONS_DATA
 
 echo "gen3fuse exited successfully"
