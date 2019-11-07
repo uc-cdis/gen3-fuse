@@ -3,6 +3,7 @@
 cleanup() {
   killall gen3-fuse
   fusermount -uz /$COMMONS_DATA/data
+  echo "gen3fuse exited successfully"
   exit 0
 }
 
@@ -38,8 +39,4 @@ else
 fi
 
 echo "done, unmounting gen3fuse"
-
 cleanup
-# fusermount -u  /$COMMONS_DATA
-
-echo "gen3fuse exited successfully"
