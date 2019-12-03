@@ -24,7 +24,7 @@ while true; do
             resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
         fi
         MANIFESTEXT=`echo $resp | jq --raw-output .manifests[-1].filename`
-        if [ $MANIFESTEXT = 'null' ]; then
+        if [ "$MANIFESTEXT" == "null" ]; then
             # user doens't have any manifest
             continue
         fi
