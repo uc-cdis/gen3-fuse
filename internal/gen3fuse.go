@@ -77,7 +77,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 
 	var didToFileInfo map[string]*IndexdResponse
 	if len(fs.DIDs) == 0 {
-		FuseLog("Warning: no DIDs were obtained from the manifest.")
+		FuseLog(fmt.Sprintf("Warning: no DIDs were obtained from the manifest %v.", manifestFilePath))
 	} else {
 		didToFileInfo, err = fs.GetFileNamesAndSizes()
 		if err != nil {
