@@ -327,6 +327,9 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 		return err
 	}
 
+	fmt.Println("gen3fuse sees contents: ")
+	fmt.Println(b)
+
 	manifestJSON := make([]manifestRecord, 0)
 	json.Unmarshal(b, &manifestJSON)
 
