@@ -33,7 +33,7 @@ while true; do
             echo mount manifest $MANIFESTEXT
             curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > /manifest.json
             manifest_contents=`cat /manifest.json`
-            echo 'manifest contents: $manifest_contents'
+            echo "manifest contents: $manifest_contents"
             gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
         fi
     else
