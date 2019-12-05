@@ -330,6 +330,9 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	manifestJSON := make([]manifestRecord, 0)
 	json.Unmarshal(b, &manifestJSON)
 
+	var structStr string = fmt.Sprintf("%#v", manifestJSON)
+	FuseLog("\nloading: " + structStr + "\n")
+
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
 	}
