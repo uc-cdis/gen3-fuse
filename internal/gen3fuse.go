@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"bufio"
+	"path/filepath"
 
 	"bytes"
 	"net/http"
@@ -320,6 +322,45 @@ func findChildInode(
 	return
 }
 
+func read(fd_r io.Reader) ([]byte, error) {
+	br := bufio.NewReader(fd_r)
+	var buf bytes.Buffer
+
+	for {
+		ba, isPrefix, err := br.ReadLine()
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+
+		buf.Write(ba)
+		if !isPrefix {
+			buf.WriteByte('\n')
+		}
+
+	}
+	return buf.Bytes(), nil
+}
+
+func readFile(path string) ([]byte, error) {
+	parentPath, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	pullPath := filepath.Join(parentPath, path)
+	file, err := os.Open(pullPath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+	return read(file)
+}
+
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	FuseLog("Inside LoadDIDsFromManifest")
 	b, err := ioutil.ReadFile(manifestFilePath)
@@ -327,8 +368,11 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 		return err
 	}
 
-	fmt.Println("gen3fuse sees contents: ")
-	fmt.Println(b)
+	ba ,err := readFile(manifestFilePath)
+	if err != nil {
+		fmt.Println("Error: %s\n", err)
+	}
+	fmt.Printf("The content of '%s' : \n%s\n", manifestFilePath, ba)
 
 	manifestJSON := make([]manifestRecord, 0)
 	json.Unmarshal(b, &manifestJSON)
