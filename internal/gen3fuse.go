@@ -32,7 +32,7 @@ type Gen3Fuse struct {
 	gen3FuseConfig *Gen3FuseConfig
 }
 
-type manifestRecord struct {
+type ManifestRecord struct {
 	ObjectId  string `json:"object_id"`
 	SubjectId string `json:"subject_id"`
 	Uuid      string `json:"uuid"`
@@ -331,7 +331,7 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	FuseLog(s)
 	FuseLog(fmt.Sprintf("The content of '%v' : \n%v\n", manifestFilePath, s))
 
-	manifestJSON := make([]manifestRecord, 0)
+	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(b, &manifestJSON)
 
 	var structStr string = fmt.Sprintf("%#v", manifestJSON)
