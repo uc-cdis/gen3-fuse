@@ -331,8 +331,11 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	FuseLog(s)
 	FuseLog(fmt.Sprintf("The content of '%v' : \n%v\n", manifestFilePath, s))
 
+	sReplaceNone := strings.Replace(s, "None", "\"\"", -1)
+	sReplaceNoneAsBytes := []byte(sReplaceNone)
+
 	manifestJSON := make([]ManifestRecord, 0)
-	json.Unmarshal(b, &manifestJSON)
+	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
 
 	var structStr string = fmt.Sprintf("%#v", manifestJSON)
 	FuseLog("\nloading: " + structStr + "\n")
@@ -349,7 +352,6 @@ func (fs *Gen3Fuse) patchAttributes(attr *fuseops.InodeAttributes) {
 	attr.Mtime = now
 	attr.Crtime = now
 }
-
 func (fs *Gen3Fuse) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
