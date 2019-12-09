@@ -362,7 +362,7 @@ func readFile(path string) ([]byte, error) {
 }
 
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
-	FuseLog("Inside LoadDIDsFromManifest")
+	FuseLog(fmt.Sprintf("Inside LoadDIDsFromManifest, loading manifest from %v", manifestFilePath))
 	b, err := ioutil.ReadFile(manifestFilePath)
 	if err != nil {
 		return err
