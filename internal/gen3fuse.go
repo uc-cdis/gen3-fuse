@@ -328,17 +328,11 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	}
 
 	s := string(b)
-	FuseLog(s)
-	FuseLog(fmt.Sprintf("The content of '%v' : \n%v\n", manifestFilePath, s))
-
 	sReplaceNone := strings.Replace(s, "None", "\"\"", -1)
 	sReplaceNoneAsBytes := []byte(sReplaceNone)
 
 	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
-
-	var structStr string = fmt.Sprintf("%#v", manifestJSON)
-	FuseLog("\nloading: " + structStr + "\n")
 
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
