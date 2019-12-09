@@ -328,8 +328,8 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	}
 
 	s := string(b)
-	fmt.Println(s)
-	fmt.Printf("The content of '%s' : \n%s\n", manifestFilePath, s)
+	FuseLog(s)
+	FuseLog(fmt.Sprintf("The content of '%v' : \n%v\n", manifestFilePath, s))
 
 	manifestJSON := make([]manifestRecord, 0)
 	json.Unmarshal(b, &manifestJSON)
