@@ -1,4 +1,5 @@
 #!/bin/bash
+
 cleanup() {
   killall gen3-fuse
   cd /data
@@ -23,15 +24,15 @@ while true; do
             resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
         fi
         MANIFESTEXT=`echo $resp | jq --raw-output .manifests[-1].filename`
-        if [ $MANIFESTEXT = 'null' ]; then
+        if [ "$MANIFESTEXT" == "null" ]; then
             # user doens't have any manifest
             continue
         fi
         FILENAME=`echo $MANIFESTEXT | sed 's/\.[^.]*$//'`
         if [ ! -d /data/$FILENAME ]; then
             echo mount manifest $MANIFESTEXT
-            curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > ~/manifest.json
-            gen3-fuse -config=~/fuse-config.yaml -manifest=~/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
+            curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > /manifest.json
+            gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
         fi
     else
         OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
