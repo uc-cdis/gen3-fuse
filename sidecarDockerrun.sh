@@ -38,7 +38,7 @@ while true; do
             gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
         fi
     else
-        OLDDIR=`df /data/manifest* |  grep manifest | cut -d'/' -f 3 | head -n 1`
+        OLDDIR=`df /data/manifest* | grep manifest | cut -d'/' -f 7 | head -n 1`
         if [ ! -z "$OLDDIR" ]; then
             echo unmount old manifest $OLDDIR
             fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
