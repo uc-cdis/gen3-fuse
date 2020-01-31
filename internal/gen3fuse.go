@@ -514,7 +514,7 @@ func (fs *Gen3Fuse) ReadFile(
 	// op.Dst: The destination buffer, whose length gives the size of the read.
 
 	op.BytesRead, err = reader.ReadAt(op.Dst, 0)
-	FuseLog(strconv.Itoa(op.BytesRead))
+	FuseLog("Read " + strconv.Itoa(op.BytesRead) + " bytes")
 	if op.BytesRead > 0 {
 		return nil
 	}
