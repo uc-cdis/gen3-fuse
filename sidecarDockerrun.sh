@@ -17,11 +17,11 @@ sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/manifest-sync-sta
 trap cleanup SIGTERM
 while true; do
     if [ $(df /data/man* | sed '1d' | wc -l) -lt 7 ]; then # remove header line, and also consider the existence of manifest snyc log
-        resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
+        resp=`curl http://manifestservice-service.$NAMESPACE/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
         if [[ $(echo $resp | jq -r '.error') =~ 'log' ]]; then
             echo get new token
             TOKEN_JSON=`curl  http://workspace-token-service.$NAMESPACE/token/  2>/dev/null | jq -r '.token'`
-            resp=`curl https://$HOSTNAME/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
+            resp=`curl http://manifestservice-service.$NAMESPACE/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
         fi
         MANIFESTEXT=`echo $resp | jq --raw-output .manifests[-1].filename`
         if [ "$MANIFESTEXT" == "null" ]; then
@@ -31,7 +31,7 @@ while true; do
         FILENAME=`echo $MANIFESTEXT | sed 's/\.[^.]*$//'`
         if [ ! -d /data/$FILENAME ]; then
             echo mount manifest $MANIFESTEXT
-            curl https://$HOSTNAME/manifests/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > /manifest.json
+            curl http://manifestservice-service.$NAMESPACE/file/$MANIFESTEXT -H "Authorization: Bearer $TOKEN_JSON"  > /manifest.json
             gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE >/proc/1/fd/1 2>/proc/1/fd/2
         fi
     else
@@ -39,5 +39,5 @@ while true; do
         echo unmount old manifest $OLDDIR
         fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
     fi
-    sleep 5
+    sleep 10
 done
