@@ -26,6 +26,7 @@ while true; do
         MANIFESTEXT=`echo $resp | jq --raw-output .manifests[-1].filename`
         if [ "$MANIFESTEXT" == "null" ]; then
             # user doens't have any manifest
+            sleep 10
             continue
         fi
         FILENAME=`echo $MANIFESTEXT | sed 's/\.[^.]*$//'`
