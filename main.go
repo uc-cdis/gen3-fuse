@@ -14,6 +14,7 @@ func main() {
 	mountPoint := flag.String("mount-point", "", "directory to mount")
 	hostname := flag.String("hostname", "", "commons domain")
 	wtsURL := flag.String("wtsURL", "", "workspace-token-service url")
+	wtsIDP := flag.String("wtsIDP", "", "workspace-token-service IDP to use (optional)")
 	apiKey := flag.String("api-key", "", "api key")
 
 	flag.Parse()
@@ -27,6 +28,7 @@ func main() {
 				-mount-point=<directory_to_mount> \
 				-hostname=<commons_domain> \
 				-wtsURL=<workspace_token_service_url> \
+				-wtsIDP=<workspace_token_service_idp> \
 				-api-key=<api_key>`)
 		os.Exit(1)
 	}
@@ -36,6 +38,12 @@ func main() {
 	// apiKey only used in the case of testing/using gen3fuse locally
 	if *wtsURL == "" && *apiKey == "" {
 		fmt.Fprint(os.Stderr, "Neither api key nor workspace-token-service url provided. Exiting gen3-fuse.\n")
+		os.Exit(1)
+	}
+
+	// wtsIDP is an optional config when using wtsURL instead of apiKey
+	if *wtsURL == "" && *wtsIDP != "" {
+		fmt.Fprint(os.Stderr, "workspace-token-service IDP can only be used when workspace-token-service URL is provided. Exiting gen3-fuse.\n")
 		os.Exit(1)
 	}
 
@@ -66,6 +74,7 @@ func main() {
 	}
 	gen3FuseConfig.Hostname = *hostname
 	gen3FuseConfig.WTSBaseURL = *wtsURL
+	gen3FuseConfig.WTSIdp = *wtsIDP
 	gen3FuseConfig.ApiKey = *apiKey
 
 	gen3fuse.InitializeApp(gen3FuseConfig, *manifestFilePath, *mountPoint)
