@@ -123,7 +123,7 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
 	requestUrl := fmt.Sprint(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath)
 	if gen3FuseConfig.WTSIdp != "" {
-		requestUrl += "/" + gen3FuseConfig.WTSIdp
+		requestUrl += "?idp=" + gen3FuseConfig.WTSIdp
 	}
 	tokenResponse := new(tokenResponse)
 	err = getJson(requestUrl, tokenResponse)

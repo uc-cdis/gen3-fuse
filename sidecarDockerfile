@@ -7,7 +7,7 @@ WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 COPY . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
 
-RUN mv /go/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
+RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
 COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh

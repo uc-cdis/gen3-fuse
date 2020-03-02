@@ -16,9 +16,12 @@ cleanup() {
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
 
+declare -A TOKEN_JSON  # requires Bash 4
+TOKEN_JSON['default']=`curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token'`
+
 while true; do
 
-    EXTERNAL_OIDC=`curl http://workspace-token-service.$NAMESPACE/external_oidc/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null | jq -r '.providers'`
+    EXTERNAL_OIDC=`curl http://workspace-token-service.$NAMESPACE/external_oidc/ -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers'`
 
     # list of IDPs to get manifests from.
     # only select IDPs the user is logged into
@@ -34,8 +37,10 @@ while true; do
             BASE_URLS+=( `_jq '.base_url'` )
         fi
     done
-    echo $IDPS
-    echo $BASE_URLS
+
+    # TODO remove or format better
+    echo "IDPS: ${IDPS[*]}"
+    echo "BASE_URLS: ${BASE_URLS[*]}"
 
     for i in "${!IDPS[@]}"; do  # TODO simplify, only loop IDPs once
         IDP=${IDPS[$i]}
@@ -45,23 +50,24 @@ while true; do
         # one folder per external IDP, except for "default"
         IDP_DATA_PATH="/data"
         if [ $IDP != "default" ]; then
-            IDP_DATA_PATH="/data/blah"  # TODO
+            DOMAIN=`echo "$BASE_URL" | awk -F/ '{print $3}'`
+            IDP_DATA_PATH="/data/$DOMAIN"
         fi
 
-        resp=`curl $BASE_URL/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
+        resp=`curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null`
 
         # if access token is expired, get a new one and try again
         if [[ $(echo $resp | jq -r '.error') =~ 'log' ]]; then
-            echo "get new token for IDP $IDP"
-            TOKEN_JSON=`curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token'`
-            resp=`curl $BASE_URL/manifests/ -H "Authorization: bearer $TOKEN_JSON" 2>/dev/null`
+            echo "get new token for IDP '$IDP'"
+            TOKEN_JSON[$IDP]=`curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token'`
+            resp=`curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null`
         fi
 
         # get the name of the most recent manifest
         MANIFEST_NAME=`echo $resp | jq --raw-output .manifests[-1].filename`
-        if [ "$MANIFEST_NAME" == "null" ]; then
-            # user doens't have any manifest
-            sleep 10
+        if [ $? != 0 || "$MANIFEST_NAME" == "null" ]; then
+            # manifests endpoint did not return JSON (maybe not configured)
+            # or user doesn't have any manifest
             continue
         fi
 
@@ -70,8 +76,9 @@ while true; do
         # gen3-fuse mounts the files in /data/ dir
         if [ ! -d $IDP_DATA_PATH/$FILENAME ]; then
             echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
-            curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer $TOKEN_JSON" > /manifest.json
-            gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=/data/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE -idp=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+            mkdir -p $IDP_DATA_PATH
+            curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
+            gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$FILENAME -hostname=https://$HOSTNAME -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
         fi
 
         # get the number of existing manifests. If there are more than 5,
@@ -79,7 +86,7 @@ while true; do
         if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt 5 ]; then # remove header line
             OLDDIR=`df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 3 | head -n 1`
             echo unmount old manifest $OLDDIR
-            fusermount -u /data/$OLDDIR; rm -rf /data/$OLDDIR
+            fusermount -u $IDP_DATA_PATH/$OLDDIR; rm -rf $IDP_DATA_PATH/$OLDDIR
         fi
     done
     sleep 10
