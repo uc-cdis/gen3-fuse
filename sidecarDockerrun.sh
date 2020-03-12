@@ -18,7 +18,7 @@ cleanup() {
   exit 0
 }
 
-# _jq ${JSON} ${KEY} returns JSON.KEY
+# _jq ${ENCODED_JSON} ${KEY} returns JSON.KEY
 _jq() {
     (base64 -d | jq -r ${2}) <<< ${1}
 }
@@ -31,18 +31,13 @@ TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?id
 
 while true; do
 
-    EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/ -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
-
-    # list of IDPs to get manifests from.
-    # only select IDPs the user is logged into
+    # get the list of IDPs the current user is logged into
+    EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
     IDPS=( "default" )
     BASE_URLS=( "https://$HOSTNAME" )
     for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-        # if user is connected, add IDP info to the lists
-        if [ $(_jq ${ROW} .refresh_token_expiration) != "null" ]; then
-            IDPS+=( $(_jq ${ROW} .idp) )
-            BASE_URLS+=( $(_jq ${ROW} .base_url) )
-        fi
+        IDPS+=( $(_jq ${ROW} .idp) )
+        BASE_URLS+=( $(_jq ${ROW} .base_url) )
     done
 
     for i in "${!IDPS[@]}"; do
