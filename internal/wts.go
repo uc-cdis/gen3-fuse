@@ -18,6 +18,7 @@ type Gen3FuseConfig struct {
 
 	// Workspace Token Service configuration
 	WTSBaseURL         string
+	WTSIdp             string
 	WTSAccessTokenPath string `yaml:"WTSAccessTokenPath"`
 
 	// Fence configuration
@@ -121,6 +122,9 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 
 func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
 	requestUrl := fmt.Sprint(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath)
+	if gen3FuseConfig.WTSIdp != "" {
+		requestUrl += "?idp=" + gen3FuseConfig.WTSIdp
+	}
 	tokenResponse := new(tokenResponse)
 	err = getJson(requestUrl, tokenResponse)
 

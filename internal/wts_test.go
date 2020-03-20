@@ -15,6 +15,7 @@ import (
 
 var testConfig = &Gen3FuseConfig{
 	WTSBaseURL:             "http://localhost/wts",
+	WTSIdp:                 "my_idp",
 	WTSAccessTokenPath:     "/token",
 	FencePresignedURLPath:  "/user/data/download/%s",
 	FenceAccessTokenPath:   "/user/credentials/api/access_token",
