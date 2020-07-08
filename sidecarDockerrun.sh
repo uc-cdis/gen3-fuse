@@ -43,7 +43,6 @@ while true; do
     for i in "${!IDPS[@]}"; do
         IDP=${IDPS[$i]}
         BASE_URL=${BASE_URLS[$i]}
-
         echo "getting manifests for IDP '$IDP' at $BASE_URL"
 
         resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
@@ -140,4 +139,3 @@ while true; do
     done
     sleep 10
 done
-
