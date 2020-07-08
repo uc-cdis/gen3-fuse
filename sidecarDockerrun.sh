@@ -43,6 +43,7 @@ while true; do
     for i in "${!IDPS[@]}"; do
         IDP=${IDPS[$i]}
         BASE_URL=${BASE_URLS[$i]}
+
         echo "getting manifests for IDP '$IDP' at $BASE_URL"
 
         resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
@@ -53,6 +54,57 @@ while true; do
             TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
             resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
         fi
+
+        #############################################################################
+        ### This code block executes the new PFB handoff flow for cohort analysis. ##
+        #############################################################################
+
+        # get the GUID of the most recent cohort
+        GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
+        if [[ $? != 0 ]]; then
+            echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+            continue
+        fi
+        if [[ "$GUID" == "null" ]]; then
+            # user doesn't have any manifest
+            continue
+        fi
+        
+        # Now we retrieve the contents of the file with this GUID
+        presigned_url_to_cohort_PFB=$(curl $BASE_URL/data/download/$GUID -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+
+        if [[ $? != 0 ]]; then
+            echo "Request to Fence endpoint at $BASE_URL/data/download/$GUID failed."
+            continue
+        fi
+        
+        echo "Got a presigned URL to the cohort: $presigned_url_to_cohort_PFB"
+
+        cohort_PFB_file_contents = $(curl $presigned_url_to_cohort_PFB 2>/dev/null)
+        if [[ $? != 0 ]]; then
+            echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
+            continue
+        fi
+
+        echo "Cohort PFB contents: $cohort_PFB_file_contents"
+
+        # one folder per IDP
+        DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
+        IDP_DATA_PATH="/data/$DOMAIN"
+        
+        local_filepath_for_cohort_PFB = "pd/data/$BASE_URL/cohort-$GUID.avro"
+
+        echo "$cohort_PFB_file_contents" > $local_filepath_for_cohort_PFB
+
+        
+
+        # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
+
+
+        #############################################################################
+        ### This code block uses manifest.json's for mounting. It will eventually ###
+        ### be deprecated in favor of the new PFB handoff flow. #####################
+        #############################################################################
 
         # get the name of the most recent manifest
         MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
@@ -88,3 +140,4 @@ while true; do
     done
     sleep 10
 done
+
