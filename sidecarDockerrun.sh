@@ -93,10 +93,11 @@ while true; do
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
         IDP_DATA_PATH="/data/$DOMAIN"
         
-        local_filepath_for_cohort_PFB="pd/data/$BASE_URL/cohort-$GUID.avro"
-        echo "$cohort_PFB_file_contents" >> $local_filepath_for_cohort_PFB
+        local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
+        touch $local_filepath_for_cohort_PFB
+        echo "$cohort_PFB_file_contents" >> "$local_filepath_for_cohort_PFB"
 
-        ls pd/data/$BASE_URL/
+        ls "$IDP_DATA_PATH/"
 
         
 
