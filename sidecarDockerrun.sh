@@ -72,12 +72,11 @@ while true; do
         # Now retrieve the contents of the file with this GUID
         echo "New GUID: $GUID"
         fence_presigned_url_endpoint="$BASE_URL/user/data/download/$GUID"
-        status_code=$(curl --write-out '%{http_code}' -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" --silent --output /dev/null $fence_presigned_url_endpoint)
         presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
         p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-        if [[ $status_code != 200 || "$p_url" == "null" ]]; then
-            echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed with status code $status_code."
+        if [[ "$p_url" == "null" ]]; then
+            echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
             echo "Error message: $presigned_url_to_cohort_PFB"
             continue
         fi
