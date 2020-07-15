@@ -43,7 +43,7 @@ while true; do
     for i in "${!IDPS[@]}"; do
         IDP=${IDPS[$i]}
         BASE_URL=${BASE_URLS[$i]}
-        echo "getting manifests for IDP '$IDP' at $BASE_URL"
+        echo "Getting manifests for IDP '$IDP' at $BASE_URL"
 
         resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
@@ -58,12 +58,15 @@ while true; do
         ### This code block executes the new PFB handoff flow for cohort analysis. ##
         #############################################################################
 
+        echo "60"
+
         # get the GUID of the most recent cohort
         GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
         if [[ $? != 0 ]]; then
             echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
             continue
         fi
+        echo "$GUID"
         if [[ "$GUID" == "null" ]]; then
             # user doesn't have any manifest
             continue
