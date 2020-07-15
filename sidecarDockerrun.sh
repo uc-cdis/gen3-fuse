@@ -81,15 +81,13 @@ while true; do
             continue
         fi
         
-        echo "Retrieved presigned URL to the cohort: $presigned_url_to_cohort_PFB"
+        echo "Retrieved presigned URL to the cohort: $p_url"
 
         cohort_PFB_file_contents=$(curl $p_url 2>/dev/null)
         if [[ $? != 0 ]]; then
             echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
             continue
         fi
-
-        echo "Cohort PFB contents: $cohort_PFB_file_contents"
 
         # one folder per IDP
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
@@ -98,6 +96,8 @@ while true; do
         local_filepath_for_cohort_PFB="pd/data/$BASE_URL/cohort-$GUID.avro"
 
         echo "$cohort_PFB_file_contents" > $local_filepath_for_cohort_PFB
+
+        ls pd/data/$BASE_URL/
 
         
 
