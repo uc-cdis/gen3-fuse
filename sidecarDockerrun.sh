@@ -75,16 +75,16 @@ while true; do
         status_code=$(curl --write-out '%{http_code}' -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" --silent --output /dev/null $fence_presigned_url_endpoint)
         presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
-        if [[ $status_code != 200 ]]; then
+        p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
+        if [[ $status_code != 200 || "$p_url" == "null" ]]; then
             echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed with status code $status_code."
             echo "Error message: $presigned_url_to_cohort_PFB"
             continue
         fi
         
         echo "Retrieved presigned URL to the cohort: $presigned_url_to_cohort_PFB"
-        p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
 
-        cohort_PFB_file_contents=$(curl $presigned_url_to_cohort_PFB 2>/dev/null)
+        cohort_PFB_file_contents=$(curl $p_url 2>/dev/null)
         if [[ $? != 0 ]]; then
             echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
             continue
