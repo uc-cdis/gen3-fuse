@@ -58,32 +58,29 @@ while true; do
         ### This code block executes the new PFB handoff flow for cohort analysis. ##
         #############################################################################
 
-        echo "60"
-        echo "$resp"
-
         # get the GUID of the most recent cohort
         GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $resp)
         if [[ $? != 0 ]]; then
             echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
             continue
         fi
-        echo "$GUID"
         if [[ "$GUID" == "null" ]]; then
             # user doesn't have any manifest
             continue
         fi
         
         # Now we retrieve the contents of the file with this GUID
-        presigned_url_to_cohort_PFB=$(curl $BASE_URL/data/download/$GUID -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+        echo "New GUID: $GUID"
+        presigned_url_to_cohort_PFB=$(curl $BASE_URL/user/data/download/$GUID -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
         if [[ $? != 0 ]]; then
-            echo "Request to Fence endpoint at $BASE_URL/data/download/$GUID failed."
+            echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
             continue
         fi
         
-        echo "Got a presigned URL to the cohort: $presigned_url_to_cohort_PFB"
+        echo "Retrieved presigned URL to the cohort: $presigned_url_to_cohort_PFB"
 
-        cohort_PFB_file_contents = $(curl $presigned_url_to_cohort_PFB 2>/dev/null)
+        cohort_PFB_file_contents=$(curl $presigned_url_to_cohort_PFB 2>/dev/null)
         if [[ $? != 0 ]]; then
             echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
             continue
@@ -95,7 +92,7 @@ while true; do
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
         IDP_DATA_PATH="/data/$DOMAIN"
         
-        local_filepath_for_cohort_PFB = "pd/data/$BASE_URL/cohort-$GUID.avro"
+        local_filepath_for_cohort_PFB="pd/data/$BASE_URL/cohort-$GUID.avro"
 
         echo "$cohort_PFB_file_contents" > $local_filepath_for_cohort_PFB
 
