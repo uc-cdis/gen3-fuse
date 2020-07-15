@@ -59,9 +59,10 @@ while true; do
         #############################################################################
 
         echo "60"
+        echo "$resp"
 
         # get the GUID of the most recent cohort
-        GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
+        GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $resp)
         if [[ $? != 0 ]]; then
             echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
             continue
@@ -109,7 +110,7 @@ while true; do
         #############################################################################
 
         # get the name of the most recent manifest
-        MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
+        MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
         if [[ $? != 0 ]]; then
             echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
             continue
