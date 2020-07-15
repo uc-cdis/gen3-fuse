@@ -82,6 +82,7 @@ while true; do
         fi
         
         echo "Retrieved presigned URL to the cohort: $presigned_url_to_cohort_PFB"
+        p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
 
         cohort_PFB_file_contents=$(curl $presigned_url_to_cohort_PFB 2>/dev/null)
         if [[ $? != 0 ]]; then
