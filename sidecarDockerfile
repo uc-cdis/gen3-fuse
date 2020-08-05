@@ -1,6 +1,6 @@
 FROM golang:1.12-alpine
 
-RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python3-dev py-pip
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python2-dev py-pip
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
