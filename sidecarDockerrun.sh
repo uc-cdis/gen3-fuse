@@ -23,6 +23,23 @@ _jq() {
     (base64 -d | jq -r ${2}) <<< ${1}
 }
 
+mount_manifest() {
+    manifest_filename=$1
+
+    echo "Debug prints:"
+    echo "Look I can see IDP_DATA_PATH= $IDP_DATA_PATH"
+    echo "Look I can see BASE_URL= $BASE_URL"
+
+    # gen3-fuse mounts the files in /data/<hostname> dir
+    if [ ! -d $IDP_DATA_PATH/$FILENAME ]; then
+        echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
+        mkdir -p $IDP_DATA_PATH
+        curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
+        gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$FILENAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+    fi
+}
+
+
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
 
@@ -68,7 +85,7 @@ while true; do
             # user doesn't have any manifest
             continue
         fi
-        
+
         # Now retrieve the contents of the file with this GUID
         echo "New GUID: $GUID"
         fence_presigned_url_endpoint="$BASE_URL/user/data/download/$GUID"
@@ -80,7 +97,7 @@ while true; do
             echo "Error message: $presigned_url_to_cohort_PFB"
             continue
         fi
-        
+
         echo "Retrieved presigned URL to the cohort: $p_url"
 
         cohort_PFB_file_contents=$(curl $p_url 2>/dev/null)
@@ -92,21 +109,28 @@ while true; do
         # one folder per IDP
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
         IDP_DATA_PATH="/data/$DOMAIN"
-        
+
         local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
         touch $local_filepath_for_cohort_PFB
         echo "$cohort_PFB_file_contents" >> "$local_filepath_for_cohort_PFB"
 
         ls "$IDP_DATA_PATH/"
 
-        
 
         # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
+        PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.avro"
+        ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
+        if [[ $? != 0 ]]; then
+            echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
+            continue
+        fi
+
+        mount_manifest $PFB_MANIFEST_NAME
 
 
         #############################################################################
-        ### This code block uses manifest.json's for mounting. It will eventually ###
-        ### be deprecated in favor of the new PFB handoff flow. #####################
+        ### This code block uses manifest.json's for mounting. It may be ############
+        ### deprecated in favor of the new PFB handoff flow. #####################
         #############################################################################
 
         # get the name of the most recent manifest
@@ -125,13 +149,7 @@ while true; do
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
         IDP_DATA_PATH="/data/$DOMAIN"
 
-        # gen3-fuse mounts the files in /data/<hostname> dir
-        if [ ! -d $IDP_DATA_PATH/$FILENAME ]; then
-            echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
-            mkdir -p $IDP_DATA_PATH
-            curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
-            gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$FILENAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
-        fi
+        mount_manifest $MANIFEST_NAME
 
         # get the number of existing manifests. If there are more than
         # MAX_MANIFESTS, delete the oldest one.

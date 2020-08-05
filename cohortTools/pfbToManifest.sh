@@ -13,8 +13,8 @@ fi
 
 > $manifest_output_filename
 
-files=$(pfb show -i $pfb_filename | grep "object_id")
-# files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # for testing purposes
+# files=$(pfb show -i $pfb_filename | grep "object_id")
+files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # for testing purposes
 
 echo "[" >> $manifest_output_filename
 
