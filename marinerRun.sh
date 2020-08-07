@@ -16,7 +16,7 @@ echo $GEN3FUSE_MANIFEST > /manifest.json
 
 echo "running gen3-fuse.."
 gen3-fuse \
--config=/config.yaml \
+-config=/fuse-config.yaml \
 -manifest=/manifest.json \
 -mount-point=/$COMMONS_DATA/data \
 -hostname=https://$HOSTNAME \
