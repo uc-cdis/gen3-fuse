@@ -4,7 +4,7 @@ gen3-fuse is a FUSE implementation built on [jacobsa/fuse](https://github.com/ja
 
 When Gen3Fuse runs in the workspace, we use the [Workspace Token Service](https://github.com/uc-cdis/workspace-token-service) to login to [Fence](https://github.com/uc-cdis/fence), which provides temporary signed URLs to access files stored in s3. This allows the end-user to natively browse files stored in s3 without access to AWS credentials.  
 
-In environments other than workspace Gen3Fuse works with an apiKey and does not consult the workspace-token-service. 
+In environments other than workspace Gen3Fuse works with an apiKey and does not consult the workspace-token-service.
 
 ## Overview
 
