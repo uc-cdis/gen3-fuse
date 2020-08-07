@@ -32,7 +32,7 @@ type Gen3Fuse struct {
 	gen3FuseConfig *Gen3FuseConfig
 }
 
-type manifestRecord struct {
+type ManifestRecord struct {
 	ObjectId  string `json:"object_id"`
 	SubjectId string `json:"subject_id"`
 	Uuid      string `json:"uuid"`
@@ -77,7 +77,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 
 	var didToFileInfo map[string]*IndexdResponse
 	if len(fs.DIDs) == 0 {
-		FuseLog("Warning: no DIDs were obtained from the manifest.")
+		FuseLog(fmt.Sprintf("Warning: no DIDs were obtained from the manifest %v.", manifestFilePath))
 	} else {
 		didToFileInfo, err = fs.GetFileNamesAndSizes()
 		if err != nil {
@@ -321,14 +321,18 @@ func findChildInode(
 }
 
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
-	FuseLog("Inside LoadDIDsFromManifest")
+	FuseLog(fmt.Sprintf("Inside LoadDIDsFromManifest, loading manifest from %v", manifestFilePath))
 	b, err := ioutil.ReadFile(manifestFilePath)
 	if err != nil {
 		return err
 	}
 
-	manifestJSON := make([]manifestRecord, 0)
-	json.Unmarshal(b, &manifestJSON)
+	s := string(b)
+	sReplaceNone := strings.Replace(s, "None", "\"\"", -1)
+	sReplaceNoneAsBytes := []byte(sReplaceNone)
+
+	manifestJSON := make([]ManifestRecord, 0)
+	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
 
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
@@ -342,7 +346,6 @@ func (fs *Gen3Fuse) patchAttributes(attr *fuseops.InodeAttributes) {
 	attr.Mtime = now
 	attr.Crtime = now
 }
-
 func (fs *Gen3Fuse) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) (err error) {
@@ -511,7 +514,7 @@ func (fs *Gen3Fuse) ReadFile(
 	// op.Dst: The destination buffer, whose length gives the size of the read.
 
 	op.BytesRead, err = reader.ReadAt(op.Dst, 0)
-	FuseLog(strconv.Itoa(op.BytesRead))
+	FuseLog("Read " + strconv.Itoa(op.BytesRead) + " bytes")
 	if op.BytesRead > 0 {
 		return nil
 	}

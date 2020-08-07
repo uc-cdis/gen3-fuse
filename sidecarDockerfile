@@ -1,4 +1,4 @@
-FROM golang:1.12-alpine as build
+FROM golang:1.12-alpine
 
 RUN apk update && apk add --no-cache git gcc musl-dev git fuse jq curl bash
 
@@ -8,14 +8,12 @@ WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 COPY . .
 RUN go build -ldflags "-linkmode external -extldflags -static"
 
-FROM alpine
-COPY --from=build /go/src/github.com/uc-cdis/gen3-fuse/gen3-fuse \
-    /go/src/github.com/uc-cdis/gen3-fuse/sidecarDockerrun.sh \
-    /go/src/github.com/uc-cdis/gen3-fuse/marinerRun.sh \
-    /go/src/github.com/uc-cdis/gen3-fuse/config.yaml \
-    /
-RUN apk update && apk add --no-cache fuse jq curl bash ca-certificates
+RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
+RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/sidecarDockerrun.sh \
+    $GOPATH/src/github.com/uc-cdis/gen3-fuse/marinerRun.sh \
+    $GOPATH/src/github.com/uc-cdis/gen3-fuse/config.yaml \
+    /
 
 ENV HOME=/
 CMD [ "/bin/bash", "/sidecarDockerrun.sh"]

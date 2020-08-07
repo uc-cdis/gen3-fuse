@@ -48,12 +48,18 @@ You can choose where errors are logged in the yaml config file. By default they 
     -mount-point=<directory_to_mount> \
     -hostname=<commons_domain> \
     -wtsURL=<workspace_token_service_url> \
+    -wtsIDP=<workspace_token_service_IDP> \
     -api-key=<api_key>
 
 Note the usage of the program above. All arguments are required except `wtsURL` and `api-key`. 
 You must provide at least one of `wtsURL` or `api-key` in order for Gen3Fuse to work, 
-because Gen3Fuse must obtain access tokens using one of those methods. The only reason you would
-ever pass `api-key` instead of `wtsURL` is for testing locally.
+because Gen3Fuse must obtain access tokens using one of those methods.
+If both arguments are provided, then the `api-key` takes precedence and Gen3Fuse gets a token 
+directly from fence and does not consult the workspace-token-service.
+To be clear, Gen3Fuse does not in general depend on the workspace-token-service to run.
+When Gen3Fuse is running in the workspace, it will use the workspace-token-service.
+In any other environment, it is sufficient to provide an `api-key`, and Gen3Fuse will work.
+If a `wtsURL` is provided, the optional `wtsIDP` argument can be used to specify which IDP to get tokens for. A list of available IDPs is served at the WTS's `/external_oidc` endpoint.
 
 You provide the yaml configuration file on the command line. In the repo, there are example yaml configs already completed.
 For a Kubernetes deployment into a Jupyter pod, config.yaml may be appropriate. To run Gen3Fuse on your own computer, local-config.yaml might be useful.
@@ -80,6 +86,10 @@ The mock workspace token service should now be running at localhost:8001. The ya
 If you've already performed the Gen3Fuse setup instructions listed above, you can just run the following in a separate window:
 
     go test tests/gen3fuse_test.go
+
+## Gen3Fuse sidecar
+
+The Gen3 workspace flow uses the Gen3Fuse sidecar to handle mounting files to the workspace. The sidecar code iterates through the IDPs made available by the workspace-token-service, obtains an access token from the WTS for the current user, and checks whether the user has uploaded a new manifest via the IDP's [manifest-service](https://github.com/uc-cdis/manifestservice). If it's the case, the Gen3Fuse CLI is then used to mount the files to the workspace.
 
 ## Performance tests
 Below are the results of a set of performance tests. Each chosen x axis value was tested 5 times, the results are shown in the scatter.
