@@ -11,7 +11,7 @@ RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fu
 
 COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh
-COPY $GOPATH/src/github.com/uc-cdis/gen3-fuse/marinerRun.sh /marinerRun.sh
+COPY marinerRun.sh /marinerRun.sh
 
 ENV HOME=/
 CMD [ "/bin/bash", "/sidecarDockerrun.sh"]
