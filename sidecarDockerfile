@@ -13,7 +13,9 @@ RUN pip install pypfb
 
 COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh
+
 COPY cohortTools/pfbToManifest.sh /pfbToManifest.sh
+COPY marinerRun.sh /marinerRun.sh
 
 ENV HOME=/
 CMD [ "/bin/bash", "/sidecarDockerrun.sh"]
