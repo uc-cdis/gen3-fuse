@@ -15,6 +15,7 @@ COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh
 
 COPY cohortTools/pfbToManifest.sh /pfbToManifest.sh
+RUN chmod 777 /pfbToManifest.sh
 COPY marinerRun.sh /marinerRun.sh
 
 ENV HOME=/
