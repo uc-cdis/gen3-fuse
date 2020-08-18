@@ -33,7 +33,6 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$FILENAME ]; then
         echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
-        mkdir -p $IDP_DATA_PATH
         curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
         gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$FILENAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
@@ -74,6 +73,8 @@ while true; do
         # one folder per IDP
         DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
         IDP_DATA_PATH="/data/$DOMAIN"
+
+        mkdir -p $IDP_DATA_PATH
 
         #############################################################################
         ### This code block executes the new PFB handoff flow for cohort analysis. ##
@@ -126,7 +127,7 @@ while true; do
         echo '---'
         ls /
         echo '---'
-        ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
+        sh /pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
         if [[ $? != 0 ]]; then
             echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
             continue
