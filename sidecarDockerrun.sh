@@ -71,6 +71,10 @@ while true; do
             resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
         fi
 
+        # one folder per IDP
+        DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
+        IDP_DATA_PATH="/data/$DOMAIN"
+
         #############################################################################
         ### This code block executes the new PFB handoff flow for cohort analysis. ##
         #############################################################################
@@ -81,7 +85,7 @@ while true; do
             echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
             continue
         fi
-        if [[ "$GUID" == "null" ]]; then
+        if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
             # user doesn't have any manifest
             continue
         fi
@@ -92,7 +96,7 @@ while true; do
         presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
         p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-        if [[ "$p_url" == "null" ]]; then
+        if [[ "$p_url" == "null" || "$p_url" == "null" ]]; then
             echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
             echo "Error message: $presigned_url_to_cohort_PFB"
             continue
@@ -106,10 +110,6 @@ while true; do
             continue
         fi
 
-        # one folder per IDP
-        DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
-        IDP_DATA_PATH="/data/$DOMAIN"
-
         local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
         touch $local_filepath_for_cohort_PFB
         echo "$cohort_PFB_file_contents" >> "$local_filepath_for_cohort_PFB"
@@ -119,6 +119,13 @@ while true; do
 
         # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
         PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.avro"
+        echo '---'
+        ls
+        echo '---'
+        pwd
+        echo '---'
+        ls /
+        echo '---'
         ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
         if [[ $? != 0 ]]; then
             echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
@@ -144,10 +151,6 @@ while true; do
             continue
         fi
         FILENAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
-
-        # one folder per IDP
-        DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
-        IDP_DATA_PATH="/data/$DOMAIN"
 
         mount_manifest $MANIFEST_NAME
 
