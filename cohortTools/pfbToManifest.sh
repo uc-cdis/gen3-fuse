@@ -3,6 +3,8 @@
 # Usage:
 # ./pfbToManifest.sh <pfb-filename> <manifest-output-filename>
 
+echo "Hello Senator, you have entered the pfbToManifest script."
+
 pfb_filename="$1"
 manifest_output_filename="$2"
 
@@ -15,6 +17,11 @@ fi
 
 # files=$(pfb show -i $pfb_filename | grep "object_id")
 files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # for testing purposes
+
+if [ $? -ne 0 ]; then
+  echo "Failed to parse object_id's from input pfb $pfb_filename"
+  exit 1
+fi
 
 echo "[" >> $manifest_output_filename
 
