@@ -114,7 +114,6 @@ while true; do
 
         ls -lh "$IDP_DATA_PATH/"
 
-
         # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
         PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.json"
         sh /pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
