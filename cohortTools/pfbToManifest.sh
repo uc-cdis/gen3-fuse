@@ -14,7 +14,7 @@ fi
 > $manifest_output_filename
 
 files=$(pfb show -i $pfb_filename | grep "object_id")
-# files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # for testing purposes
+# files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # TODO: delete this line
 
 if [ $? -ne 0 ]; then
   echo "Parsing $pfb_filename failed. Exiting..."
