@@ -1,6 +1,6 @@
 FROM golang:1.12-alpine
 
-RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python2-dev py-pip
+RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python3-dev py-pip libffi-dev
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
@@ -9,7 +9,7 @@ RUN go build -ldflags "-linkmode external -extldflags -static"
 
 RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
-RUN pip install -Iv pypfb==0.4.3
+RUN pip3 install pypfb
 
 COPY config.yaml /fuse-config.yaml
 COPY sidecarDockerrun.sh /sidecarDockerrun.sh
