@@ -24,7 +24,7 @@ fi
 echo "[" >> $manifest_output_filename
 
 while read record; do
-  object_id=$(jq --raw-output .object.object_id <<< $record)
+  object_id="$(jq --raw-output .object.object_id <<< '$record')"
   echo "{\"object_id\":\"$object_id\"}," >> $manifest_output_filename
 done <<< "$files"
 
