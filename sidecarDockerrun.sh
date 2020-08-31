@@ -133,12 +133,6 @@ while true; do
 
         handle_new_PFB_GUIDs $resp $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
 
-
-        #############################################################################
-        ### This code block uses manifest.json for mounting. It may eventually be ###
-        ### deprecated in favor of the new PFB handoff flow. ########################
-        #############################################################################
-
         # get the name of the most recent manifest
         MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
         if [[ $? != 0 ]]; then
