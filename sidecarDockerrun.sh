@@ -90,7 +90,7 @@ handle_new_PFB_GUIDs() {
         return
     fi
 
-    mount_manifest $PFB_MANIFEST_NAME $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
+    mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 }
 
 
@@ -131,7 +131,7 @@ while true; do
 
         mkdir -p $IDP_DATA_PATH
 
-        handle_new_PFB_GUIDs $resp $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
+        handle_new_PFB_GUIDs "$resp" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
         # get the name of the most recent manifest
         MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
@@ -144,7 +144,7 @@ while true; do
             continue
         fi
 
-        mount_manifest $MANIFEST_NAME $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
+        mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
         # get the number of existing manifests. If there are more than
         # MAX_MANIFESTS, delete the oldest one.
