@@ -24,18 +24,73 @@ _jq() {
 }
 
 mount_manifest() {
-    manifest_filename=$1
+    MANIFEST_NAME=$1
+    IDP_DATA_PATH=$2
+    NAMESPACE=$3
+    IDP=$4
+    BASE_URL=$5
+    TOKEN_JSON=$6
 
-    echo "Debug prints:"
-    echo "Look I can see IDP_DATA_PATH= $IDP_DATA_PATH"
-    echo "Look I can see BASE_URL= $BASE_URL"
+    MOUNT_NAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
 
     # gen3-fuse mounts the files in /data/<hostname> dir
-    if [ ! -d $IDP_DATA_PATH/$FILENAME ]; then
+    if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
         curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
-        gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$FILENAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
+}
+
+handle_new_PFB_GUIDs() {
+    manifest_service_resp=$1
+    IDP_DATA_PATH=$2
+    NAMESPACE=$3
+    IDP=$4
+    BASE_URL=$5
+    TOKEN_JSON=$6
+
+    # Get the GUID of the most recent cohort
+    GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $manifest_service_resp)
+    if [[ $? != 0 ]]; then
+        echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+        return
+    fi
+    if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
+        # user doesn't have any manifest
+        return
+    fi
+
+    # Now retrieve the contents of the file with this GUID
+    fence_presigned_url_endpoint="$BASE_URL/user/data/download/$GUID"
+    presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+
+    p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
+    if [[ "$p_url" == "null" || "$p_url" == "null" ]]; then
+        echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
+        echo "Error message: $presigned_url_to_cohort_PFB"
+        return
+    fi
+
+    local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
+    curl $p_url --output $local_filepath_for_cohort_PFB
+    if [[ $? != 0 ]]; then
+        echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
+        return
+    fi
+
+    ls -lh "$IDP_DATA_PATH/"
+
+    # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
+    PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.json"
+    pushd /
+    ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
+    popd
+    if [[ $? != 0 ]]; then
+        echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
+        return
+    fi
+
+    mount_manifest $PFB_MANIFEST_NAME $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
 }
 
 
@@ -76,66 +131,12 @@ while true; do
 
         mkdir -p $IDP_DATA_PATH
 
-        #############################################################################
-        ### This code block executes the new PFB handoff flow for cohort analysis. ##
-        #############################################################################
-
-        # get the GUID of the most recent cohort
-        GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $resp)
-        if [[ $? != 0 ]]; then
-            echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
-            continue
-        fi
-        if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
-            # user doesn't have any manifest
-            continue
-        fi
-
-        # Now retrieve the contents of the file with this GUID
-        echo "New GUID: $GUID"
-        fence_presigned_url_endpoint="$BASE_URL/user/data/download/$GUID"
-        presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
-
-        p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-        if [[ "$p_url" == "null" || "$p_url" == "null" ]]; then
-            echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
-            echo "Error message: $presigned_url_to_cohort_PFB"
-            continue
-        fi
-
-        echo "Retrieved presigned URL to the cohort: $p_url"
-
-        local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
-        curl $p_url --output $local_filepath_for_cohort_PFB
-        if [[ $? != 0 ]]; then
-            echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
-            continue
-        fi
-
-        ls -lh "$IDP_DATA_PATH/"
-
-        # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
-        PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.json"
-        pwd
-        pwd
-        pwd
-        pwd
-        pwd
-        pwd
-        cd /
-        ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
-        # cd back
-        if [[ $? != 0 ]]; then
-            echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
-            continue
-        fi
-
-        mount_manifest $PFB_MANIFEST_NAME
+        handle_new_PFB_GUIDs $resp $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
 
 
         #############################################################################
-        ### This code block uses manifest.json's for mounting. It may be ############
-        ### deprecated in favor of the new PFB handoff flow. #####################
+        ### This code block uses manifest.json for mounting. It may eventually be ###
+        ### deprecated in favor of the new PFB handoff flow. ########################
         #############################################################################
 
         # get the name of the most recent manifest
@@ -148,9 +149,8 @@ while true; do
             # user doesn't have any manifest
             continue
         fi
-        FILENAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
 
-        mount_manifest $MANIFEST_NAME
+        mount_manifest $MANIFEST_NAME $IDP_DATA_PATH $NAMESPACE $IDP $BASE_URL $TOKEN_JSON
 
         # get the number of existing manifests. If there are more than
         # MAX_MANIFESTS, delete the oldest one.
