@@ -15,8 +15,6 @@ fi
 touch "$manifest_output_filename"
 
 files=$(pfb show -i "$pfb_filename" | grep "object_id")
-# files=$(pfb show -i $pfb_filename -n 70 | grep "object_id") # TODO: delete this line
-echo "variable files: $files" # TODO: delete this line
 
 if [ $? -ne 0 ]; then
   echo "Parsing $pfb_filename failed. Exiting..."
@@ -26,8 +24,6 @@ fi
 echo "[" >> "$manifest_output_filename"
 
 while read -r record; do
-  echo '28 -----'
-  echo "$record"
   object_id=$(jq --raw-output .object.object_id <<< "$record")
   echo "{\"object_id\":\"$object_id\"}," >> "$manifest_output_filename"
 done <<< "$files"

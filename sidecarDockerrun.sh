@@ -35,7 +35,7 @@ mount_manifest() {
 
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
-        echo mount manifest at $IDP_DATA_PATH/$MANIFEST_NAME
+        echo mount manifest at $IDP_DATA_PATH/$MOUNT_NAME
         curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
         gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
@@ -78,12 +78,10 @@ handle_new_PFB_GUIDs() {
         return
     fi
 
-    ls -lh "$IDP_DATA_PATH/"
-
     # Next steps: use pyPFB to parse DIDs from the PFB and mount them using gen3-fuse
-    PFB_MANIFEST_NAME="$IDP_DATA_PATH/manifest-$GUID.json"
+    PFB_MANIFEST_NAME="manifest-$GUID.json"
     pushd /
-    ./pfbToManifest.sh $local_filepath_for_cohort_PFB $PFB_MANIFEST_NAME
+    ./pfbToManifest.sh $local_filepath_for_cohort_PFB "$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
     popd
     if [[ $? != 0 ]]; then
         echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
