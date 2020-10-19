@@ -134,7 +134,7 @@ check_for_new_PFB_GUIDs() {
     TOKEN_JSON=$5
 
     resp='' # The below function populates this variable
-    query_manifest_service $BASE_URL/manifests/cohorts/
+    query_manifest_service $BASE_URL/manifests/cohorts
 
     echo "this: $resp"
 
