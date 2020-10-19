@@ -69,6 +69,7 @@ run_sidecar() {
 }
 
 query_manifest_service() {
+    # This function populates a return value in a variable called $resp
     URL=$1
 
     resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
@@ -79,8 +80,6 @@ query_manifest_service() {
         TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
     fi
-
-    return resp
 }
 
 mount_manifest() {
@@ -110,7 +109,8 @@ check_for_new_manifests() {
 
     echo "Getting manifests for IDP '$IDP' at $BASE_URL"
 
-    resp=$(query_manifest_service $BASE_URL/manifests/)
+    resp = '' # The below function populates this variable
+    query_manifest_service $BASE_URL/manifests/
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
@@ -133,7 +133,8 @@ check_for_new_PFB_GUIDs() {
     BASE_URL=$4
     TOKEN_JSON=$5
 
-    resp=$(query_manifest_service $BASE_URL/cohorts/)
+    resp = '' # The below function populates this variable
+    query_manifest_service $BASE_URL/cohorts/
 
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
