@@ -154,7 +154,7 @@ check_for_new_PFB_GUIDs() {
     presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
     p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-    if [[ "$p_url" == "null" || "$p_url" == "" || ! -z $p_url]]; then
+    if [[ "$p_url" == "null" || "$p_url" == "" || ! -z $p_url ]]; then
         echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
         echo "Error message: $presigned_url_to_cohort_PFB"
         return
