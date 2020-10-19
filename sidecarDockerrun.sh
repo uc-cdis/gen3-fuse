@@ -109,7 +109,7 @@ check_for_new_manifests() {
 
     echo "Getting manifests for IDP '$IDP' at $BASE_URL"
 
-    resp = '' # The below function populates this variable
+    resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
 
     # get the name of the most recent manifest
@@ -133,13 +133,13 @@ check_for_new_PFB_GUIDs() {
     BASE_URL=$4
     TOKEN_JSON=$5
 
-    resp = '' # The below function populates this variable
-    query_manifest_service $BASE_URL/cohorts/
+    resp='' # The below function populates this variable
+    query_manifest_service $BASE_URL/manifests/cohorts/
 
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
-        echo "Manifests endpoints at $BASE_URL/cohorts/ did not return JSON. Maybe it's not configured?"
+        echo "Manifests endpoints at $BASE_URL/manifests/cohorts/ did not return JSON. Maybe it's not configured?"
         return
     fi
     if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
