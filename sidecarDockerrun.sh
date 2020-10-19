@@ -136,6 +136,8 @@ check_for_new_PFB_GUIDs() {
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/cohorts/
 
+    echo "this: $resp"
+
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
