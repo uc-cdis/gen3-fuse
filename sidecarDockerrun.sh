@@ -136,8 +136,6 @@ check_for_new_PFB_GUIDs() {
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/cohorts
 
-    echo "this: $resp"
-
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
@@ -149,12 +147,14 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
+    echo "Got new GUID: $GUID"
+
     # Now retrieve the contents of the file with this GUID
     fence_presigned_url_endpoint="$BASE_URL/user/data/download/$GUID"
     presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
     p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-    if [[ "$p_url" == "null" || "$p_url" == "null" ]]; then
+    if [[ "$p_url" == "null" || "$p_url" == "" || ! -z $p_url]]; then
         echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
         echo "Error message: $presigned_url_to_cohort_PFB"
         return
