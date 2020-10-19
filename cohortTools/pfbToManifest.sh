@@ -3,6 +3,14 @@
 # Usage:
 # ./pfbToManifest.sh <pfb-filename> <manifest-output-filename>
 
+# This script takes an exported cohort's PFB and parses out object IDs corresponding data files
+# in indexd. The object IDs are outputted in a new manifest.json file of the format
+# [
+#    {
+#        "object_id" : "fbd5b74e-6789-4f42-b88f-f75e72777f5d",
+#    },
+#    ...
+# ]
 
 pfb_filename="$1"
 manifest_output_filename="$2"

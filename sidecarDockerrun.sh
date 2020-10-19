@@ -44,16 +44,6 @@ run_sidecar() {
         for i in "${!IDPS[@]}"; do
             IDP=${IDPS[$i]}
             BASE_URL=${BASE_URLS[$i]}
-            echo "Getting manifests for IDP '$IDP' at $BASE_URL"
-
-            resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
-
-            # if access token is expired, get a new one and try again
-            if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
-                echo "get new token for IDP '$IDP'"
-                TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-                resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
-            fi
 
             # one folder per IDP
             DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
@@ -61,22 +51,11 @@ run_sidecar() {
 
             mkdir -p $IDP_DATA_PATH
 
-            # get the name of the most recent manifest
-            MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
-            if [[ $? != 0 ]]; then
-                echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
-                continue
-            fi
-            if [[ "$MANIFEST_NAME" == "null" ]]; then
-                # user doesn't have any manifest
-                continue
-            fi
-
-            mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+            check_for_new_manifests "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
             check_for_new_PFB_GUIDs "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
-            # get the number of existing manifests. If there are more than
+            # get the number of existing mounted manifests. If there are more than
             # MAX_MANIFESTS, delete the oldest one.
             if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt $MAX_MANIFESTS ]; then # remove header line
                 OLDDIR=$(df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 4 | head -n 1)
@@ -86,6 +65,21 @@ run_sidecar() {
         done
         sleep 10
     done
+}
+
+query_manifest_service() {
+    URL=$1
+
+    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+
+    # if access token is expired, get a new one and try again
+    if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
+        echo "get new token for IDP '$IDP'"
+        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
+        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+    fi
+
+    return resp
 }
 
 mount_manifest() {
@@ -106,6 +100,31 @@ mount_manifest() {
     fi
 }
 
+check_for_new_manifests() {
+    IDP_DATA_PATH=$1
+    NAMESPACE=$2
+    IDP=$3
+    BASE_URL=$4
+    TOKEN_JSON=$5
+
+    echo "Getting manifests for IDP '$IDP' at $BASE_URL"
+
+    resp=query_manifest_service $BASE_URL/manifests/
+
+    # get the name of the most recent manifest
+    MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
+    if [[ $? != 0 ]]; then
+        echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+        return
+    fi
+    if [[ "$MANIFEST_NAME" == "null" ]]; then
+        # user doesn't have any manifest
+        return
+    fi
+
+    mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+}
+
 check_for_new_PFB_GUIDs() {
     IDP_DATA_PATH=$1
     NAMESPACE=$2
@@ -113,8 +132,10 @@ check_for_new_PFB_GUIDs() {
     BASE_URL=$4
     TOKEN_JSON=$5
 
+    resp=query_manifest_service $BASE_URL/cohorts/
+
     # Get the GUID of the most recent cohort
-    GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $manifest_service_resp)
+    GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
         echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
         return
