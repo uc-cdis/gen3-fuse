@@ -110,7 +110,7 @@ check_for_new_manifests() {
 
     echo "Getting manifests for IDP '$IDP' at $BASE_URL"
 
-    resp=query_manifest_service $BASE_URL/manifests/
+    resp=query_manifest_service "$BASE_URL/manifests/"
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
