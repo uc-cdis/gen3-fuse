@@ -31,7 +31,6 @@ TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?id
 
 run_sidecar() {
     while true; do
-
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
@@ -49,7 +48,9 @@ run_sidecar() {
             DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
             IDP_DATA_PATH="/data/$DOMAIN"
 
-            mkdir -p $IDP_DATA_PATH
+            if [ ! -d $IDP_DATA_PATH ]; then
+                mkdir -p $IDP_DATA_PATH
+            fi
 
             check_for_new_manifests "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
@@ -137,11 +138,11 @@ check_for_new_PFB_GUIDs() {
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
-        echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+        echo "Manifests endpoints at $BASE_URL/cohorts/ did not return JSON. Maybe it's not configured?"
         return
     fi
     if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
-        # user doesn't have any manifest
+        # user doesn't have any cohorts
         return
     fi
 
