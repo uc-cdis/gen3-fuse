@@ -23,6 +23,71 @@ _jq() {
     (base64 -d | jq -r ${2}) <<< ${1}
 }
 
+sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
+trap cleanup SIGTERM
+
+declare -A TOKEN_JSON  # requires Bash 4
+TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
+
+run_sidecar() {
+    while true; do
+
+        # get the list of IDPs the current user is logged into
+        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
+        IDPS=( "default" )
+        BASE_URLS=( "https://$HOSTNAME" )
+        for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
+            IDPS+=( $(_jq ${ROW} .idp) )
+            BASE_URLS+=( $(_jq ${ROW} .base_url) )
+        done
+
+        for i in "${!IDPS[@]}"; do
+            IDP=${IDPS[$i]}
+            BASE_URL=${BASE_URLS[$i]}
+            echo "Getting manifests for IDP '$IDP' at $BASE_URL"
+
+            resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+
+            # if access token is expired, get a new one and try again
+            if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
+                echo "get new token for IDP '$IDP'"
+                TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
+                resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+            fi
+
+            # one folder per IDP
+            DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
+            IDP_DATA_PATH="/data/$DOMAIN"
+
+            mkdir -p $IDP_DATA_PATH
+
+            # get the name of the most recent manifest
+            MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
+            if [[ $? != 0 ]]; then
+                echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+                continue
+            fi
+            if [[ "$MANIFEST_NAME" == "null" ]]; then
+                # user doesn't have any manifest
+                continue
+            fi
+
+            mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+
+            check_for_new_PFB_GUIDs "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+
+            # get the number of existing manifests. If there are more than
+            # MAX_MANIFESTS, delete the oldest one.
+            if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt $MAX_MANIFESTS ]; then # remove header line
+                OLDDIR=$(df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 4 | head -n 1)
+                echo unmount old manifest $OLDDIR
+                fusermount -u $IDP_DATA_PATH/$OLDDIR; rm -rf $IDP_DATA_PATH/$OLDDIR
+            fi
+        done
+        sleep 10
+    done
+}
+
 mount_manifest() {
     MANIFEST_NAME=$1
     IDP_DATA_PATH=$2
@@ -41,13 +106,12 @@ mount_manifest() {
     fi
 }
 
-handle_new_PFB_GUIDs() {
-    manifest_service_resp=$1
-    IDP_DATA_PATH=$2
-    NAMESPACE=$3
-    IDP=$4
-    BASE_URL=$5
-    TOKEN_JSON=$6
+check_for_new_PFB_GUIDs() {
+    IDP_DATA_PATH=$1
+    NAMESPACE=$2
+    IDP=$3
+    BASE_URL=$4
+    TOKEN_JSON=$5
 
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .manifests.cohorts[-1].filename <<< $manifest_service_resp)
@@ -91,66 +155,4 @@ handle_new_PFB_GUIDs() {
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 }
 
-
-sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
-trap cleanup SIGTERM
-
-declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
-
-while true; do
-
-    # get the list of IDPs the current user is logged into
-    EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
-    IDPS=( "default" )
-    BASE_URLS=( "https://$HOSTNAME" )
-    for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-        IDPS+=( $(_jq ${ROW} .idp) )
-        BASE_URLS+=( $(_jq ${ROW} .base_url) )
-    done
-
-    for i in "${!IDPS[@]}"; do
-        IDP=${IDPS[$i]}
-        BASE_URL=${BASE_URLS[$i]}
-        echo "Getting manifests for IDP '$IDP' at $BASE_URL"
-
-        resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
-
-        # if access token is expired, get a new one and try again
-        if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
-            echo "get new token for IDP '$IDP'"
-            TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-            resp=$(curl $BASE_URL/manifests/ -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
-        fi
-
-        # one folder per IDP
-        DOMAIN=$(awk -F/ '{print $3}' <<< $BASE_URL)
-        IDP_DATA_PATH="/data/$DOMAIN"
-
-        mkdir -p $IDP_DATA_PATH
-
-        handle_new_PFB_GUIDs "$resp" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
-
-        # get the name of the most recent manifest
-        MANIFEST_NAME=$(jq --raw-output .manifests.manifests[-1].filename <<< $resp)
-        if [[ $? != 0 ]]; then
-            echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
-            continue
-        fi
-        if [[ "$MANIFEST_NAME" == "null" ]]; then
-            # user doesn't have any manifest
-            continue
-        fi
-
-        mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
-
-        # get the number of existing manifests. If there are more than
-        # MAX_MANIFESTS, delete the oldest one.
-        if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt $MAX_MANIFESTS ]; then # remove header line
-            OLDDIR=$(df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 4 | head -n 1)
-            echo unmount old manifest $OLDDIR
-            fusermount -u $IDP_DATA_PATH/$OLDDIR; rm -rf $IDP_DATA_PATH/$OLDDIR
-        fi
-    done
-    sleep 10
-done
+run_sidecar
