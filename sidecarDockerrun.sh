@@ -191,7 +191,7 @@ check_for_new_PFB_GUIDs() {
 
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 
-    # rm $PFB_MANIFEST_NAME
+    rm "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 }
 
 run_sidecar
