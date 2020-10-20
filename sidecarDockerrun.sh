@@ -123,6 +123,13 @@ check_for_new_manifests() {
         return
     fi
 
+    echo "----- check_for_new_manifests pwd:"
+    pwd
+    echo "--------"
+    echo "----- check_for_new_manifests ls:"
+    ls
+    echo "--------"
+
     mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 }
 
@@ -184,9 +191,9 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
-    echo "-- pwd: "
+    echo "-- check for new pfb guids pwd: "
     pwd
-    echo "-- ls: "
+    echo "-- check for new pfb guids ls: "
     ls
     echo "--"
 
