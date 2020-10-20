@@ -149,7 +149,7 @@ check_for_new_PFB_GUIDs() {
 
     # Check if this GUID has been mounted already
     MOUNT_NAME="manifest-$GUID"
-    if [[ -d $MOUNT_NAME ]]; then
+    if [[ -d $IDP_DATA_PATH/$MOUNT_NAME ]]; then
         return
     fi
 
