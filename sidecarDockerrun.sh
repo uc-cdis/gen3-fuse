@@ -147,6 +147,12 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
+    # Check if this GUID has been mounted already
+    MOUNT_NAME="manifest-$GUID"
+    if [[ -d $MOUNT_NAME ]]; then
+        return
+    fi
+
     echo "Got new GUID: $GUID"
 
     # Now retrieve the contents of the file with this GUID
@@ -179,6 +185,8 @@ check_for_new_PFB_GUIDs() {
     fi
 
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+
+    rm $PFB_MANIFEST_NAME
 }
 
 run_sidecar
