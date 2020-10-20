@@ -52,6 +52,8 @@ run_sidecar() {
                 mkdir -p $IDP_DATA_PATH
             fi
 
+            echo "Checking for new exports with IDP '$IDP' at $BASE_URL"
+
             check_for_new_manifests "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
             check_for_new_PFB_GUIDs "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
@@ -101,7 +103,7 @@ mount_manifest() {
 
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
-        echo mount manifest at $IDP_DATA_PATH/$MOUNT_NAME
+        echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
         gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
 }
@@ -113,8 +115,6 @@ check_for_new_manifests() {
     BASE_URL=$4
     TOKEN_JSON=$5
 
-    echo "Getting manifests for IDP '$IDP' at $BASE_URL"
-
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
 
@@ -125,16 +125,9 @@ check_for_new_manifests() {
         return
     fi
     if [[ "$MANIFEST_NAME" == "null" ]]; then
-        # user doesn't have any manifest
+        # user doesn't have any manifests
         return
     fi
-
-    echo "----- check_for_new_manifests pwd:"
-    pwd
-    echo "--------"
-    echo "----- check_for_new_manifests ls:"
-    ls
-    echo "--------"
 
     mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" ""
 }
@@ -196,12 +189,6 @@ check_for_new_PFB_GUIDs() {
         echo "Failed to parse object IDs from $local_filepath_for_cohort_PFB."
         return
     fi
-
-    echo "-- check for new pfb guids pwd: "
-    pwd
-    echo "-- check for new pfb guids ls: "
-    ls
-    echo "--"
 
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 
