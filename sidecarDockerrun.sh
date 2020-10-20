@@ -184,6 +184,12 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
+    echo "-- pwd: "
+    pwd
+    echo "-- ls: "
+    ls
+    echo "--"
+
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
 
     rm $PFB_MANIFEST_NAME
