@@ -78,7 +78,7 @@ query_manifest_service() {
 
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
-        echo "get new token for IDP '$IDP'"
+        echo "Getting new token for IDP '$IDP'"
         TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
     fi
@@ -121,7 +121,7 @@ check_for_new_manifests() {
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
-        echo "Manifests endpoints at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
+        echo "Manifest service endpoint at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
         return
     fi
     if [[ "$MANIFEST_NAME" == "null" ]]; then
@@ -145,7 +145,7 @@ check_for_new_PFB_GUIDs() {
     # Get the GUID of the most recent cohort
     GUID=$(jq --raw-output .cohorts[-1].filename <<< $resp)
     if [[ $? != 0 ]]; then
-        echo "Manifests endpoints at $BASE_URL/manifests/cohorts/ did not return JSON. Maybe it's not configured?"
+        echo "Manifest service endpoint at $BASE_URL/manifests/cohorts/ did not return JSON. Maybe it's not configured?"
         return
     fi
     if [[ "$GUID" == "null" || "$GUID" == "" ]]; then
@@ -166,7 +166,6 @@ check_for_new_PFB_GUIDs() {
     presigned_url_to_cohort_PFB=$(curl $fence_presigned_url_endpoint -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
 
     p_url=$(jq --raw-output .url <<< $presigned_url_to_cohort_PFB)
-    echo "Got presigned url: $p_url"
     if [[ "$p_url" == "null" || "$p_url" == "" || -z $p_url ]]; then
         echo "Request to Fence endpoint at $BASE_URL/user/data/download/$GUID failed."
         echo "Error message: $presigned_url_to_cohort_PFB"
