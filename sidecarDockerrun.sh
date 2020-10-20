@@ -89,14 +89,20 @@ mount_manifest() {
     IDP=$4
     BASE_URL=$5
     TOKEN_JSON=$6
+    PATH_TO_MANIFEST=$7
 
     MOUNT_NAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
+
+    # If the manifest is not present locally, we download it
+    if [[ $PATH_TO_MANIFEST == "" ]]; then
+        curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
+        PATH_TO_MANIFEST=/manifest.json
+    fi
 
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo mount manifest at $IDP_DATA_PATH/$MOUNT_NAME
-        curl $BASE_URL/manifests/file/$MANIFEST_NAME -H "Authorization: Bearer ${TOKEN_JSON[$IDP]}" > /manifest.json
-        gen3-fuse -config=/fuse-config.yaml -manifest=/manifest.json -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
 }
 
@@ -130,7 +136,7 @@ check_for_new_manifests() {
     ls
     echo "--------"
 
-    mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+    mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" ""
 }
 
 check_for_new_PFB_GUIDs() {
@@ -197,9 +203,9 @@ check_for_new_PFB_GUIDs() {
     ls
     echo "--"
 
-    mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON"
+    mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 
-    rm $PFB_MANIFEST_NAME
+    # rm $PFB_MANIFEST_NAME
 }
 
 run_sidecar
