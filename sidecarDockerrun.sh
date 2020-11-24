@@ -31,14 +31,17 @@ TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?id
 
 run_sidecar() {
     while true; do
+    echo "TOKEN_JSON" $TOKEN_JSON
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
+        echo "EXTERNAL_OIDC:" $(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}")
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
             IDPS+=( $(_jq ${ROW} .idp) )
             BASE_URLS+=( $(_jq ${ROW} .base_url) )
         done
+        echo "WTS IDPs: $IDPS"
 
         for i in "${!IDPS[@]}"; do
             IDP=${IDPS[$i]}
@@ -60,8 +63,11 @@ run_sidecar() {
 
             # get the number of existing mounted manifests. If there are more than
             # MAX_MANIFESTS, delete the oldest one.
+            echo 1
             if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt $MAX_MANIFESTS ]; then # remove header line
+                echo 2
                 OLDDIR=$(df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 4 | head -n 1)
+                echo 3
                 echo unmount old manifest $OLDDIR
                 fusermount -u $IDP_DATA_PATH/$OLDDIR; rm -rf $IDP_DATA_PATH/$OLDDIR
             fi
@@ -80,6 +86,8 @@ query_manifest_service() {
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
         TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
+        echo "query_manifest_service resp:" $IDP $resp
+        echo "query_manifest_service TOKEN_JSON:" $TOKEN_JSON[$IDP]
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
     fi
 }
@@ -129,6 +137,7 @@ check_for_new_manifests() {
         return
     fi
 
+    echo "check_for_new_manifests" $MANIFEST_NAME $IDP
     mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" ""
 }
 
@@ -189,6 +198,7 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
+    echo "check_for_new_PFB_GUIDs" $PFB_MANIFEST_NAME $IDP
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 
     rm "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
