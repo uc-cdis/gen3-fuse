@@ -26,15 +26,19 @@ _jq() {
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
 
+WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+if [[ ( "$WTS_STATUS" -ne 200 ) ]]; then
+    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy"
+    exit 1
+fi
+
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/token/?idp=default 2>/dev/null | jq -r '.token')
+TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
 
 run_sidecar() {
     while true; do
-    echo "TOKEN_JSON" $TOKEN_JSON
         # get the list of IDPs the current user is logged into
-        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
-        echo "EXTERNAL_OIDC:" $(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}")
+        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
@@ -63,11 +67,8 @@ run_sidecar() {
 
             # get the number of existing mounted manifests. If there are more than
             # MAX_MANIFESTS, delete the oldest one.
-            echo 1
             if [ $(df $IDP_DATA_PATH/manifest* | sed '1d' | wc -l) -gt $MAX_MANIFESTS ]; then # remove header line
-                echo 2
                 OLDDIR=$(df $IDP_DATA_PATH/manifest* | grep manifest | cut -d'/' -f 4 | head -n 1)
-                echo 3
                 echo unmount old manifest $OLDDIR
                 fusermount -u $IDP_DATA_PATH/$OLDDIR; rm -rf $IDP_DATA_PATH/$OLDDIR
             fi
@@ -85,9 +86,7 @@ query_manifest_service() {
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-        echo "query_manifest_service resp:" $IDP $resp
-        echo "query_manifest_service TOKEN_JSON:" $TOKEN_JSON[$IDP]
+        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
     fi
 }
@@ -112,7 +111,7 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
-        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE.svc.cluster.local -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
 }
 
@@ -137,7 +136,6 @@ check_for_new_manifests() {
         return
     fi
 
-    echo "check_for_new_manifests" $MANIFEST_NAME $IDP
     mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" ""
 }
 
@@ -198,7 +196,6 @@ check_for_new_PFB_GUIDs() {
         return
     fi
 
-    echo "check_for_new_PFB_GUIDs" $PFB_MANIFEST_NAME $IDP
     mount_manifest "$PFB_MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
 
     rm "/$IDP_DATA_PATH/$PFB_MANIFEST_NAME"
