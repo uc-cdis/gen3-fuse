@@ -27,14 +27,14 @@ sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-st
 trap cleanup SIGTERM
 
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
+TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/token/?idp=default 2>/dev/null | jq -r '.token')
 
 run_sidecar() {
     while true; do
     echo "TOKEN_JSON" $TOKEN_JSON
         # get the list of IDPs the current user is logged into
-        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
-        echo "EXTERNAL_OIDC:" $(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}")
+        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
+        echo "EXTERNAL_OIDC:" $(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}")
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
@@ -85,7 +85,7 @@ query_manifest_service() {
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
+        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE.svc.cluster.local/token/?idp=$IDP 2>/dev/null | jq -r '.token')
         echo "query_manifest_service resp:" $IDP $resp
         echo "query_manifest_service TOKEN_JSON:" $TOKEN_JSON[$IDP]
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
@@ -112,7 +112,7 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
-        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE.svc.cluster.local -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
     fi
 }
 
