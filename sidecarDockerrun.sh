@@ -42,8 +42,8 @@ run_sidecar() {
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-            IDPS+=( $(_jq ${ROW} .idp) )
-            BASE_URLS+=( $(_jq ${ROW} .base_url) )
+            IDPS+=" $(_jq ${ROW} .idp)"
+            BASE_URLS+=" $(_jq ${ROW} .base_url)"
         done
         echo "WTS IDPs: $IDPS"
 
