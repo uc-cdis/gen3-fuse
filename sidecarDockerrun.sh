@@ -39,13 +39,15 @@ run_sidecar() {
     while true; do
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
-        IDPS=( "default" )
-        BASE_URLS=( "https://$HOSTNAME" )
+        IDPS="default"
+        BASE_URLS="https://$HOSTNAME"
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
             IDPS+=" $(_jq ${ROW} .idp)"
             BASE_URLS+=" $(_jq ${ROW} .base_url)"
         done
-        echo "WTS IDPs: $IDPS"
+        IDPS=($IDPS)
+        BASE_URLS=($BASE_URLS)
+        echo "WTS IDPs: ${IDPS[@]}"
 
         for i in "${!IDPS[@]}"; do
             IDP=${IDPS[$i]}
