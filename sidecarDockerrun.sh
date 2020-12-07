@@ -182,9 +182,10 @@ check_for_new_PFB_GUIDs() {
     fi
 
     local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
-    curl $p_url --output $local_filepath_for_cohort_PFB
+    # --create-dirs because GUIDs with prefix contain "/"
+    curl $p_url --output $local_filepath_for_cohort_PFB --create-dirs
     if [[ $? != 0 ]]; then
-        echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
+        echo "Request to presigned URL for cohort PFB at $p_url failed."
         return
     fi
 
