@@ -23,6 +23,8 @@ fi
 if [[ -f "$manifest_output_filename" ]]; then
   rm "$manifest_output_filename"
 fi
+# mkdir before touch because GUIDs with prefix contain "/"
+mkdir -p $(dirname $manifest_output_filename)
 touch "$manifest_output_filename"
 
 files=$(pfb show -i "$pfb_filename" | grep "object_id")

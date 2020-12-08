@@ -26,6 +26,12 @@ _jq() {
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
 
+WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+if [[ ( "$WTS_STATUS" -ne 200 ) ]]; then
+    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy"
+    exit 1
+fi
+
 declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
 
@@ -39,6 +45,7 @@ run_sidecar() {
             IDPS+=( $(_jq ${ROW} .idp) )
             BASE_URLS+=( $(_jq ${ROW} .base_url) )
         done
+        echo "WTS IDPs: ${IDPS[@]}"
 
         for i in "${!IDPS[@]}"; do
             IDP=${IDPS[$i]}
@@ -173,9 +180,10 @@ check_for_new_PFB_GUIDs() {
     fi
 
     local_filepath_for_cohort_PFB="$IDP_DATA_PATH/cohort-$GUID.avro"
-    curl $p_url --output $local_filepath_for_cohort_PFB
+    # --create-dirs because GUIDs with prefix contain "/"
+    curl $p_url --output $local_filepath_for_cohort_PFB --create-dirs
     if [[ $? != 0 ]]; then
-        echo "Request to presigned URL for cohort PFB at $presigned_url_to_cohort_PFB failed."
+        echo "Request to presigned URL for cohort PFB at $p_url failed."
         return
     fi
 

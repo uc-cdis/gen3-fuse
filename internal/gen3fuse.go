@@ -597,7 +597,6 @@ func (fs *Gen3Fuse) HandleIndexdError(resp *http.Response) (err error) {
 func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Response, err error) {
 	requestUrl := fmt.Sprintf(fs.gen3FuseConfig.Hostname+fs.gen3FuseConfig.FencePresignedURLPath, DID+"?expires_in=900")
 	FuseLog("GET " + requestUrl)
-	FuseLog(fmt.Sprintf("With token %v", fs.accessToken))
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
 	req.Header.Add("Authorization", "Bearer "+fs.accessToken)
