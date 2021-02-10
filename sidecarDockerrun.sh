@@ -27,14 +27,8 @@ sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-st
 trap cleanup SIGTERM
 
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
-WTS_RETRY_COUNTER = 0
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
-    if [[ ( "$WTS_RETRY_COUNTER" -ge 20 ) ]]; then
-        "Still unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy after 5 minutes. Check WTS status."
-        exit 1
-    fi
     echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
-    WTS_RETRY_COUNTER=$(( WTS_RETRY_COUNTER + 1 ))
     sleep 15
     WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
 done
