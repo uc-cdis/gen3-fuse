@@ -27,10 +27,11 @@ sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-st
 trap cleanup SIGTERM
 
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
-if [[ ( "$WTS_STATUS" -ne 200 ) ]]; then
-    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy"
-    exit 1
-fi
+while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
+    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
+    sleep 15
+    WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+done
 
 declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
