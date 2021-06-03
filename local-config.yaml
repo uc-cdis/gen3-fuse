@@ -1,8 +1,0 @@
-FencePresignedURLPath: "/user/data/download/%s"
-FenceAccessTokenPath: "/user/credentials/api/access_token"
-
-IndexdBulkFileInfoPath: "/index/bulk/documents"
-
-WTSAccessTokenPath: "/token"
-
-LogFilePath: "fuse_log.txt"

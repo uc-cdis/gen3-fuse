@@ -4,19 +4,19 @@ RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse j
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
-COPY . .
+COPY ./src .
 RUN go build -ldflags "-linkmode external -extldflags -static"
 
 RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
 RUN pip3 install pypfb
 
-COPY config.yaml /fuse-config.yaml
-COPY sidecarDockerrun.sh /sidecarDockerrun.sh
+COPY src/config.yaml /fuse-config.yaml
+COPY scripts/sidecarDockerrun.sh /sidecarDockerrun.sh
 
-COPY cohortTools/pfbToManifest.sh /pfbToManifest.sh
+COPY src/cohortTools/pfbToManifest.sh /pfbToManifest.sh
 RUN chmod 777 /pfbToManifest.sh
-COPY marinerRun.sh /marinerRun.sh
+COPY scripts/marinerRun.sh /marinerRun.sh
 
 ENV HOME=/
 CMD [ "/bin/bash", "/sidecarDockerrun.sh"]

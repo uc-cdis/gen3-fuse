@@ -1,0 +1,11 @@
+-------- Testing with benchmark/manifest-1000-files.json ---------
+Time to mount filesystem: 1.960
+Time to mount filesystem: 1.909
+Time to mount filesystem: 1.814
+Time to mount filesystem: 1.903
+Time to mount filesystem: 1.849
+Time to list 1000 files: 1.238
+Time to list 1000 files: 0.704
+Time to list 1000 files: 0.694
+Time to list 1000 files: 0.724
+Time to list 1000 files: 1.470

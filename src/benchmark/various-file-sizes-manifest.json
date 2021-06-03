@@ -1,0 +1,32 @@
+[
+  {
+    "object_id": "did-for-my-1mb-file",
+    "subject_id": "xxx",
+    "filename": "1mb.txt"
+  },
+  {
+    "object_id": "3134c363-988b-43dd-a438-f86da74bed21",
+    "subject_id": "xxx",
+    "filename": "10mb.txt"
+  },
+  {
+    "object_id": "370c4adf-b9cb-4741-9fda-bf34cb9dff16",
+    "subject_id": "xxx",
+    "filename": "100mb.txt"
+  },
+  {
+    "object_id": "did-for-20mb",
+    "subject_id": "xxx",
+    "filename": "20mb.txt"
+  },
+  {
+    "object_id": "did-for-50mb",
+    "subject_id": "xxx",
+    "filename": "50mb.txt"
+  },
+  {
+    "object_id": "did-for-70mb",
+    "subject_id": "xxx",
+    "filename": "70mb.txt"
+  }
+]
