@@ -35,8 +35,16 @@ while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
     WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 done
 
+default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+while [[ "$default_token" = null ]]; do
+    echo "Unable to get token from '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
+    echo $default_token
+    sleep 15
+    default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+done
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+TOKEN_JSON['default']=$default_token
+echo "token: ${TOKEN_JSON['default']}"
 run_sidecar() {
     while true; do
         # get the list of IDPs the current user is logged into
@@ -138,6 +146,7 @@ check_for_new_manifests() {
         echo "User doesn't have any manifests"
         return
     fi
+    echo "mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" """
     mount_manifest "$MANIFEST_NAME" "$IDP_DATA_PATH" "$NAMESPACE" "$IDP" "$BASE_URL" "$TOKEN_JSON" ""
 }
 
