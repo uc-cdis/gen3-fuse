@@ -146,6 +146,9 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
+
+	fmt.Printf("\n\ninside InitializeInodes with didToFileInfo : %#v\n\n", didToFileInfo)
+
 	FuseLog("Inside InitializeInodes")
 	const (
 		rootInode fuseops.InodeID = fuseops.RootInodeID + iota
