@@ -55,7 +55,7 @@ You can choose where errors are logged in the yaml config file. By default they 
     -wtsIDP=<workspace_token_service_IDP> \
     -api-key=<api_key>
 
-Note the usage of the program above. All arguments are required except `wtsURL` and `api-key`.
+Note the usage of the program above. All arguments are required except `wtsURL`, `wtsIDP`, and `api-key`.
 You must provide at least one of `wtsURL` or `api-key` in order for Gen3Fuse to work,
 because Gen3Fuse must obtain access tokens using one of those methods.
 If both arguments are provided, then the `api-key` takes precedence and Gen3Fuse gets a token

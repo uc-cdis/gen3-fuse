@@ -27,12 +27,15 @@ type Gen3Fuse struct {
 
 	DIDs []string
 
+	DIDsToCommonsHostnames map[string]string
+
 	inodes map[fuseops.InodeID]*inodeInfo
 
 	gen3FuseConfig *Gen3FuseConfig
 }
 
 type ManifestRecord struct {
+	CommonsHostname string `json:"commons_hostname"`
 	ObjectId  string `json:"object_id"`
 	SubjectId string `json:"subject_id"`
 	Uuid      string `json:"uuid"`
@@ -45,7 +48,7 @@ type IndexdResponse struct {
 	URLs     []string `json:"urls"`
 }
 
-// APIError carriese a failure to get a 2XX response
+// APIError carries a failure to get a 2XX response
 type APIError struct {
 	StatusCode int
 	URL        string
@@ -75,7 +78,10 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		return nil, err
 	}
 
+	fmt.Printf("fs.DIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
+
 	var didToFileInfo map[string]*IndexdResponse
+
 	if len(fs.DIDs) == 0 {
 		FuseLog(fmt.Sprintf("Warning: no DIDs were obtained from the manifest %v.", manifestFilePath))
 	} else {
@@ -334,8 +340,13 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
 
+	fs.DIDsToCommonsHostnames = make(map[string]string)
+
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
+		if len(manifestJSON[i].CommonsHostname) > 0 {
+			fs.DIDsToCommonsHostnames[manifestJSON[i].ObjectId] = manifestJSON[i].CommonsHostname
+		}
 	}
 	return
 }
@@ -626,8 +637,9 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 }
 
 func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResponse, err error) {
-	requestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
-	var DIDsWithQuotes []string
+	indexdRequestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
+	var DIDsWithIndexdInfo []string
+	var DIDsWithFileInfoFromExternalHosts []string
 	didToFileInfo = make(map[string]*IndexdResponse, 0)
 	FuseLog(fmt.Sprintf("Getting %v records", len(fs.DIDs)))
 	for i := 0; i < len(fs.DIDs); i += 1000 {
@@ -635,14 +647,26 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResp
 		if len(fs.DIDs) < last {
 			last = len(fs.DIDs)
 		}
-		DIDsWithQuotes = []string{}
+		DIDsWithIndexdInfo = []string{}
+
+
+		fmt.Printf("DIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
+
 		for _, x := range fs.DIDs[i:last] {
-			DIDsWithQuotes = append(DIDsWithQuotes, "\""+x+"\"")
+			if _, ok := fs.DIDsToCommonsHostnames[x]; ok {
+				fmt.Printf("Added %#v to externals\n", x)
+				DIDsWithFileInfoFromExternalHosts = append(DIDsWithFileInfoFromExternalHosts, "\""+x+"\"")
+			} else {
+				fmt.Printf("Added %#v to indexd list\n", x)
+				DIDsWithIndexdInfo = append(DIDsWithIndexdInfo, "\""+x+"\"")
+			}
 		}
 
-		postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
+		postData := "[ " + strings.Join(DIDsWithIndexdInfo, ",") + " ]"
 
-		FuseLog(fmt.Sprintf("POST %v with %v - %v records", requestURL, i, last))
+		fmt.Printf("postData: %#v\n", postData)
+
+		FuseLog(fmt.Sprintf("POST %v with %v records from window %v - %v", indexdRequestURL, len(DIDsWithIndexdInfo), i, last))
 
 		// Decent timeout because there might be lots of files to list
 		timeout := time.Duration(60 * time.Second)
@@ -650,7 +674,7 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResp
 			Timeout: timeout,
 		}
 
-		req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(postData)))
+		req, err := http.NewRequest("POST", indexdRequestURL, bytes.NewBuffer([]byte(postData)))
 		req.Header.Set("Content-Type", "application/json")
 
 		if err != nil {
