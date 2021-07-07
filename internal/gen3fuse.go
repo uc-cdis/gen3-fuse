@@ -36,16 +36,16 @@ type Gen3Fuse struct {
 
 type ManifestRecord struct {
 	CommonsHostname string `json:"commons_hostname"`
-	ObjectId  string `json:"object_id"`
-	SubjectId string `json:"subject_id"`
-	Uuid      string `json:"uuid"`
+	ObjectId        string `json:"object_id"`
+	SubjectId       string `json:"subject_id"`
+	Uuid            string `json:"uuid"`
 }
 
 type FileInfo struct {
-	Filename string   `json:"file_name"`
-	Filesize uint64   `json:"size"`
-	DID      string   `json:"did"`
-	URLs     []string `json:"urls"`
+	Filename         string   `json:"file_name"`
+	Filesize         uint64   `json:"size"`
+	DID              string   `json:"did"`
+	URLs             []string `json:"urls"`
 	FromExternalHost bool
 }
 
@@ -639,12 +639,15 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 }
 
 func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didToFileInfo map[string]*FileInfo) (didToFileInfoModified map[string]*FileInfo, err error) {
+	// Manifest entries with a commons_hostname field filled out have FileInfo metadata
+	// in a location other than Indexd. This function retrieves that metadata.
+	// Currently supporting DRS objects with metadata in the JCOIN commons.
+
 	fmt.Printf("\ninside function GetExternalHostFileInfos with didsWithExternalInfo: %#v\n", didsWithExternalInfo)
 	for i := 0; i < len(didsWithExternalInfo); i += 1 {
 		did := didsWithExternalInfo[i]
 		commonsHostname := fs.DIDsToCommonsHostnames[did]
-		// For now, we assume all commons hostnames provided are for the
-		// DRS use case.
+		// For now, we assume all commons hostnames provided are for the DRS use case.
 		drsRequestURL := commonsHostname + "ga4gh/drs/v1/objects/" + did
 
 		timeout := time.Duration(4 * time.Second)
@@ -690,7 +693,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 			fileInfo.Filesize = uint64(size)
 		}
 
-		accessMethods, ok := jsonMap["access_methods"].([]( interface{} ))
+		accessMethods, ok := jsonMap["access_methods"].([](interface{}))
 		accessMethodsMap, ok := accessMethods[0].(map[string]interface{})
 		accessMethod := ""
 		if ok {
@@ -836,8 +839,8 @@ func FetchContentsAtURL(presignedUrl string, offset int64, size int64, fullsize 
 
 func FuseLog(message string) {
 
-        // Log messages to stdout too
-        fmt.Println(message)
+	// Log messages to stdout too
+	fmt.Println(message)
 
 	file, err := os.OpenFile(LogFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0664)
 	if err != nil {
