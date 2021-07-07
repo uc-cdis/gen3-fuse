@@ -113,6 +113,12 @@ type inodeInfo struct {
 
 	// For files, the presigned URL
 	presignedUrl string
+
+	// Indicates whether the object info is from a source other than Indexd
+	FromExternalHost bool
+
+	// For DRS files -- the access URL(s) that yields a presigned URL for the file when given an auth token
+	ExternalAccessURLs []string
 }
 
 func getFilePathFromURL(urls []string) (result []string, ok bool) {
@@ -232,7 +238,11 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 			continue
 		}
 		filename := paths[len(paths)-1]
-		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize)
+		externalURLs := []string{}
+		if fileInfo.FromExternalHost {
+			externalURLs = fileInfo.URLs
+		}
+		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 		inodeID++
 		paths = append([]string{"by-filepath"}, paths...)
 		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize)
@@ -258,10 +268,10 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		}
 		if i == len(paths)-1 {
 			// leaf file
-			createInode(inodes, parentNode, inodeID, filename, did, filesize)
+			createInode(inodes, parentNode, inodeID, filename, did, filesize, false, nil)
 		} else {
 			// intermediate directory
-			createInode(inodes, parentNode, inodeID, filename, "", 0)
+			createInode(inodes, parentNode, inodeID, filename, "", 0, false, nil)
 		}
 		inodeIDMap[fullpath] = inodeID
 		inodeID++
@@ -269,7 +279,7 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 	return inodeID
 }
 
-func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64) {
+func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64, fromExternalHost bool, externalURLs []string) {
 	parent, ok := inodes[parentID]
 	if !ok {
 		panic(fmt.Sprintf("Something went wrong, can't find parent folder for %v, guid %v", filename, did))
@@ -310,7 +320,10 @@ func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID
 			},
 			Name: filename,
 			DID:  did,
+			FromExternalHost: fromExternalHost,
+			ExternalAccessURLs: externalURLs,
 		}
+		fmt.Printf("\n\nexternal URLs? %v", externalURLs)
 	}
 }
 
@@ -471,7 +484,7 @@ func (fs *Gen3Fuse) OpenFile(
 	}
 
 	if info.presignedUrl == "" || len(info.presignedUrl) < 3 {
-		presignedUrl, err := fs.GetPresignedURL(info.DID)
+		presignedUrl, err := fs.GetPresignedURL(info)
 		if err != nil {
 			return err
 		}
@@ -500,7 +513,7 @@ func (fs *Gen3Fuse) ReadFile(
 		// aws returns 403 when URL is expired
 		if apiErr.StatusCode == 403 {
 			FuseLog(fmt.Sprintf("Get a fresh url for %v", info.DID))
-			presignedURL, urlErr := fs.GetPresignedURL(info.DID)
+			presignedURL, urlErr := fs.GetPresignedURL(info)
 			if urlErr != nil {
 				FuseLog("Error fetching file contents: " + urlErr.Error())
 				err = fuse.ENOENT
@@ -548,8 +561,43 @@ type presignedURLResponse struct {
 	Url string
 }
 
-func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
+func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
 	FuseLog("Inside GetPresignedURL")
+
+	DID := info.DID
+
+	if info.FromExternalHost == true {
+		// The below code talks to the DRS API instead of Fence to get a presigned URL
+		if len(info.ExternalAccessURLs) < 1 {
+			FuseLog(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
+			return "", err
+		}
+		drsRequestURL := info.ExternalAccessURLs[0]
+		FuseLog("GET " + drsRequestURL)
+
+		req, err := http.NewRequest("GET", drsRequestURL, nil)
+		req.Header.Add("Authorization", "Bearer " + fs.accessToken)
+		req.Header.Add("Accept", "application/json")
+
+		if err != nil {
+			FuseLog(err.Error() + " (" + DID + ") ")
+			return "", err
+		}
+		resp, err := myClient.Do(req)
+
+		if err != nil {
+			FuseLog(err.Error() + " (" + DID + ") ")
+			return "", err
+		}
+
+		fmt.Printf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp)
+
+		return "", nil
+
+	}
+
+
+	// The below code talks to the Fence microservice (case where info.FromExternalHost == false)
 	resp, err := fs.FetchURLResponseFromFence(DID)
 	if err != nil {
 		return "", err
