@@ -41,11 +41,12 @@ type ManifestRecord struct {
 	Uuid      string `json:"uuid"`
 }
 
-type IndexdResponse struct {
+type FileInfo struct {
 	Filename string   `json:"file_name"`
 	Filesize uint64   `json:"size"`
 	DID      string   `json:"did"`
 	URLs     []string `json:"urls"`
+	FromExternalHost bool
 }
 
 // APIError carries a failure to get a 2XX response
@@ -80,7 +81,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 
 	fmt.Printf("fs.DIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
 
-	var didToFileInfo map[string]*IndexdResponse
+	var didToFileInfo map[string]*FileInfo
 
 	if len(fs.DIDs) == 0 {
 		FuseLog(fmt.Sprintf("Warning: no DIDs were obtained from the manifest %v.", manifestFilePath))
@@ -140,7 +141,7 @@ func getFilePathFromURL(urls []string) (result []string, ok bool) {
 	return filePaths[1:len(filePaths)], true
 }
 
-func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.InodeID]*inodeInfo {
+func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*inodeInfo {
 	/*
 		Create a file system with a fixed structure described by the manifest
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
@@ -346,6 +347,7 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	fs.DIDsToCommonsHostnames = make(map[string]string)
 
 	for i := 0; i < len(manifestJSON); i++ {
+		fmt.Printf("fs.manifestJSON[i]: %#v\n", manifestJSON[i].ObjectId)
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
 		if len(manifestJSON[i].CommonsHostname) > 0 {
 			fs.DIDsToCommonsHostnames[manifestJSON[i].ObjectId] = manifestJSON[i].CommonsHostname
@@ -639,11 +641,83 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 	return urlResponse.Url
 }
 
-func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResponse, err error) {
+func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didToFileInfo map[string]*FileInfo) (didToFileInfoModified map[string]*FileInfo, err error) {
+	fmt.Printf("\ninside function GetExternalHostFileInfos with didsWithExternalInfo: %#v\n", didsWithExternalInfo)
+	for i := 0; i < len(didsWithExternalInfo); i += 1 {
+		did := didsWithExternalInfo[i]
+		commonsHostname := fs.DIDsToCommonsHostnames[did]
+		// For now, we assume all commons hostnames provided are for the
+		// DRS use case.
+		drsRequestURL := commonsHostname + "ga4gh/drs/v1/objects/" + did
+
+		timeout := time.Duration(4 * time.Second)
+		client := http.Client{
+			Timeout: timeout,
+		}
+
+		req, err := http.NewRequest("GET", drsRequestURL, nil)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			FuseLog(err.Error())
+			return nil, err
+		}
+		resp, err := client.Do(req)
+
+		if resp.StatusCode != 200 {
+			// TODO: add error handling like the file name and sizes function
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyString := string(bodyBytes)
+
+		// get json as a map with interface{}
+		jsonMap := make(map[string](interface{}))
+		err = json.Unmarshal([]byte(bodyString), &jsonMap)
+		if err != nil {
+			fmt.Printf("ERROR: Failed to unmarshal DRS file info JSON, %s", err.Error())
+		}
+		fmt.Printf("INFO: jsonMap, %s", jsonMap)
+
+		fileInfo := &FileInfo{DID: did, FromExternalHost: true}
+
+		name, ok := jsonMap["name"].(string)
+		if ok {
+			fileInfo.Filename = name
+		}
+
+		size, ok := jsonMap["size"].(float64)
+		if ok {
+			fileInfo.Filesize = uint64(size)
+		}
+
+		// self_uri, ok := jsonMap["self_uri"].(string)
+		// if ok {
+		// 	fileInfo.URLs = []string{self_uri}
+		// }
+		accessMethod := ""
+		access_methods, ok := jsonMap["access_methods"].(map[string]string)
+		if ok {
+			accessMethod = access_methods["type"]
+		}
+		if accessMethod == "s3" {
+			uri := drsRequestURL
+			fileInfo.URLs = []string{uri}
+		}
+
+		didToFileInfo[did] = fileInfo
+		fmt.Printf("\nINFO: fileInfo, %v", fileInfo)
+	}
+	return didToFileInfo, nil
+}
+
+func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, err error) {
 	indexdRequestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
 	var DIDsWithIndexdInfo []string
 	var DIDsWithFileInfoFromExternalHosts []string
-	didToFileInfo = make(map[string]*IndexdResponse, 0)
+	didToFileInfo = make(map[string]*FileInfo, 0)
 	FuseLog(fmt.Sprintf("Getting %v records", len(fs.DIDs)))
 	for i := 0; i < len(fs.DIDs); i += 1000 {
 		last := i + 1000
@@ -653,12 +727,12 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResp
 		DIDsWithIndexdInfo = []string{}
 
 
-		fmt.Printf("DIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
+		fmt.Printf("\nDIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
 
 		for _, x := range fs.DIDs[i:last] {
 			if _, ok := fs.DIDsToCommonsHostnames[x]; ok {
 				fmt.Printf("Added %#v to externals\n", x)
-				DIDsWithFileInfoFromExternalHosts = append(DIDsWithFileInfoFromExternalHosts, "\""+x+"\"")
+				DIDsWithFileInfoFromExternalHosts = append(DIDsWithFileInfoFromExternalHosts, x)
 			} else {
 				fmt.Printf("Added %#v to indexd list\n", x)
 				DIDsWithIndexdInfo = append(DIDsWithIndexdInfo, "\""+x+"\"")
@@ -700,12 +774,23 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResp
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
 		bodyString := string(bodyBytes)
 
-		didToFileInfoList := make([]*IndexdResponse, 0)
+		didToFileInfoList := make([]*FileInfo, 0)
 		json.Unmarshal([]byte(bodyString), &didToFileInfoList)
 
-		for _, i := range didToFileInfoList {
-			didToFileInfo[i.DID] = i
+		for _, fileInfo := range didToFileInfoList {
+			didToFileInfo[fileInfo.DID] = fileInfo
 		}
+
+		// Now get the DRS file infos
+		// drsFileInfos := fs.GetExternalHostFileInfos(didsWithExternalInfo)
+		didToFileInfo, err = fs.GetExternalHostFileInfos(DIDsWithFileInfoFromExternalHosts, didToFileInfo)
+
+		if err != nil {
+			FuseLog(fmt.Sprintf("Error: failed to retrieve external host file infos. %v ", err))
+			return nil, err
+		}
+
+		fmt.Printf("\n\nnew and updated didToFileInfo: %#v\n", didToFileInfo)
 
 	}
 	return didToFileInfo, nil
