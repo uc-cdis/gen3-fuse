@@ -79,8 +79,6 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		return nil, err
 	}
 
-	fmt.Printf("fs.DIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
-
 	var didToFileInfo map[string]*FileInfo
 
 	if len(fs.DIDs) == 0 {
@@ -347,7 +345,6 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	fs.DIDsToCommonsHostnames = make(map[string]string)
 
 	for i := 0; i < len(manifestJSON); i++ {
-		fmt.Printf("fs.manifestJSON[i]: %#v\n", manifestJSON[i].ObjectId)
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
 		if len(manifestJSON[i].CommonsHostname) > 0 {
 			fs.DIDsToCommonsHostnames[manifestJSON[i].ObjectId] = manifestJSON[i].CommonsHostname
@@ -678,8 +675,8 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		err = json.Unmarshal([]byte(bodyString), &jsonMap)
 		if err != nil {
 			fmt.Printf("ERROR: Failed to unmarshal DRS file info JSON, %s", err.Error())
+			return nil, err
 		}
-		fmt.Printf("INFO: jsonMap, %s", jsonMap)
 
 		fileInfo := &FileInfo{DID: did, FromExternalHost: true}
 
@@ -693,18 +690,19 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 			fileInfo.Filesize = uint64(size)
 		}
 
-		// self_uri, ok := jsonMap["self_uri"].(string)
-		// if ok {
-		// 	fileInfo.URLs = []string{self_uri}
-		// }
+		accessMethods, ok := jsonMap["access_methods"].([]( interface{} ))
+		accessMethodsMap, ok := accessMethods[0].(map[string]interface{})
 		accessMethod := ""
-		access_methods, ok := jsonMap["access_methods"].(map[string]string)
 		if ok {
-			accessMethod = access_methods["type"]
+			accessMethodTest := accessMethodsMap["type"]
+			accessMethod, ok = accessMethodTest.(string)
 		}
+
 		if accessMethod == "s3" {
-			uri := drsRequestURL
+			uri := drsRequestURL + "/access/s3"
 			fileInfo.URLs = []string{uri}
+		} else {
+			FuseLog(fmt.Sprintf("Found unrecognized access_method in DRS response: %s", accessMethod))
 		}
 
 		didToFileInfo[did] = fileInfo
@@ -726,9 +724,6 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 		}
 		DIDsWithIndexdInfo = []string{}
 
-
-		fmt.Printf("\nDIDsToCommonsHostnames: %#v\n", fs.DIDsToCommonsHostnames)
-
 		for _, x := range fs.DIDs[i:last] {
 			if _, ok := fs.DIDsToCommonsHostnames[x]; ok {
 				fmt.Printf("Added %#v to externals\n", x)
@@ -740,8 +735,6 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 		}
 
 		postData := "[ " + strings.Join(DIDsWithIndexdInfo, ",") + " ]"
-
-		fmt.Printf("postData: %#v\n", postData)
 
 		FuseLog(fmt.Sprintf("POST %v with %v records from window %v - %v", indexdRequestURL, len(DIDsWithIndexdInfo), i, last))
 
