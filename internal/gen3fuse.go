@@ -323,7 +323,6 @@ func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID
 			FromExternalHost: fromExternalHost,
 			ExternalAccessURLs: externalURLs,
 		}
-		fmt.Printf("\n\nexternal URLs? %v", externalURLs)
 	}
 }
 
@@ -591,11 +590,42 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 		}
 
 		fmt.Printf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp)
+		if resp.StatusCode == 200 {
+			return fs.URLFromSuccessResponseFromJCOIN(resp), nil
+		} else if resp.StatusCode == 401 {
+			// refresh the access token and try again just one more time
+			FuseLog("Got 401, retrying...")
+			FuseLog("GET " + drsRequestURL)
 
+			req, err := http.NewRequest("GET", drsRequestURL, nil)
+			req.Header.Add("Authorization", "Bearer " + fs.accessToken)
+			req.Header.Add("Accept", "application/json")
+
+			if err != nil {
+				FuseLog(err.Error() + " (" + DID + ") ")
+				return "", err
+			}
+			resp, err := myClient.Do(req)
+
+			if err != nil {
+				FuseLog(err.Error() + " (" + DID + ") ")
+				return "", err
+			}
+
+			fmt.Printf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp)
+			if resp.StatusCode == 200 {
+				return fs.URLFromSuccessResponseFromJCOIN(resp), nil
+			} else {
+				FuseLog(fmt.Sprintf("After refreshing the access token, JCOIN still returns status code %d when asked for a presigned URL.", resp.StatusCode))
+				FuseLog("The full error page is below:\n")
+				bodyBytes, _ := ioutil.ReadAll(resp.Body)
+				bodyString := string(bodyBytes)
+				FuseLog(bodyString)
+				return "", nil
+			}
+		}
 		return "", nil
-
 	}
-
 
 	// The below code talks to the Fence microservice (case where info.FromExternalHost == false)
 	resp, err := fs.FetchURLResponseFromFence(DID)
@@ -608,7 +638,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 	if resp.StatusCode == 200 {
 		return fs.URLFromSuccessResponseFromFence(resp), nil
 	} else if resp.StatusCode == 401 {
-		// get a new access token, try again just one more time
+		// refresh the access token and try again just one more time
 		FuseLog("Got 401, retrying...")
 		fs.accessToken, err = GetAccessToken(fs.gen3FuseConfig)
 		if err != nil {
@@ -685,6 +715,17 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 	json.Unmarshal([]byte(bodyString), &urlResponse)
 	return urlResponse.Url
 }
+
+func (fs *Gen3Fuse) URLFromSuccessResponseFromJCOIN(resp *http.Response) (presignedUrl string) {
+	// TODO: verify that the JCOIN presigned URL response structure matches the parse format here.
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+
+	var urlResponse presignedURLResponse
+	json.Unmarshal([]byte(bodyString), &urlResponse)
+	return urlResponse.Url
+}
+
 
 func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didToFileInfo map[string]*FileInfo) (didToFileInfoModified map[string]*FileInfo, err error) {
 	// Manifest entries with a commons_hostname field filled out have FileInfo metadata
