@@ -318,9 +318,9 @@ func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID
 				Mode:  0444,
 				Size:  filesize,
 			},
-			Name: filename,
-			DID:  did,
-			FromExternalHost: fromExternalHost,
+			Name:               filename,
+			DID:                did,
+			FromExternalHost:   fromExternalHost,
 			ExternalAccessURLs: externalURLs,
 		}
 	}
@@ -575,7 +575,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 		FuseLog("GET " + drsRequestURL)
 
 		req, err := http.NewRequest("GET", drsRequestURL, nil)
-		req.Header.Add("Authorization", "Bearer " + fs.accessToken)
+		req.Header.Add("Authorization", "Bearer "+fs.accessToken)
 		req.Header.Add("Accept", "application/json")
 
 		if err != nil {
@@ -598,7 +598,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 			FuseLog("GET " + drsRequestURL)
 
 			req, err := http.NewRequest("GET", drsRequestURL, nil)
-			req.Header.Add("Authorization", "Bearer " + fs.accessToken)
+			req.Header.Add("Authorization", "Bearer "+fs.accessToken)
 			req.Header.Add("Accept", "application/json")
 
 			if err != nil {
@@ -725,7 +725,6 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromJCOIN(resp *http.Response) (presig
 	json.Unmarshal([]byte(bodyString), &urlResponse)
 	return urlResponse.Url
 }
-
 
 func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didToFileInfo map[string]*FileInfo) (didToFileInfoModified map[string]*FileInfo, err error) {
 	// Manifest entries with a commons_hostname field filled out have FileInfo metadata
