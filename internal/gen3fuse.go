@@ -152,7 +152,7 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
 
-	fmt.Printf("\n\ninside InitializeInodes with didToFileInfo : %#v\n\n", didToFileInfo)
+	FuseLog(fmt.Sprintf("\n\ninside InitializeInodes with didToFileInfo : %#v\n\n", didToFileInfo))
 
 	FuseLog("Inside InitializeInodes")
 	const (
@@ -589,7 +589,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 			return "", err
 		}
 
-		fmt.Printf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp)
+		FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
 			return fs.URLFromSuccessResponseFromJCOIN(resp), nil
 		} else if resp.StatusCode == 401 {
@@ -612,7 +612,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 				return "", err
 			}
 
-			fmt.Printf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp)
+			FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 			if resp.StatusCode == 200 {
 				return fs.URLFromSuccessResponseFromJCOIN(resp), nil
 			} else {
@@ -731,7 +731,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 	// in a location other than Indexd. This function retrieves that metadata.
 	// Currently supporting DRS objects with metadata in the JCOIN commons.
 
-	fmt.Printf("\ninside function GetExternalHostFileInfos with didsWithExternalInfo: %#v\n", didsWithExternalInfo)
+	FuseLog(fmt.Sprintf("\ninside function GetExternalHostFileInfos with didsWithExternalInfo: %#v\n", didsWithExternalInfo))
 	for i := 0; i < len(didsWithExternalInfo); i += 1 {
 		did := didsWithExternalInfo[i]
 		commonsHostname := fs.DIDsToCommonsHostnames[did]
@@ -765,7 +765,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		jsonMap := make(map[string](interface{}))
 		err = json.Unmarshal([]byte(bodyString), &jsonMap)
 		if err != nil {
-			fmt.Printf("ERROR: Failed to unmarshal DRS file info JSON, %s", err.Error())
+			FuseLog(fmt.Sprintf("ERROR: Failed to unmarshal DRS file info JSON, %s", err.Error()))
 			return nil, err
 		}
 
@@ -797,7 +797,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		}
 
 		didToFileInfo[did] = fileInfo
-		fmt.Printf("\nINFO: fileInfo, %v", fileInfo)
+		FuseLog(fmt.Sprintf("\nINFO: fileInfo, %v", fileInfo))
 	}
 	return didToFileInfo, nil
 }
@@ -817,10 +817,10 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 
 		for _, x := range fs.DIDs[i:last] {
 			if _, ok := fs.DIDsToCommonsHostnames[x]; ok {
-				fmt.Printf("Added %#v to externals\n", x)
+				FuseLog(fmt.Sprintf("Added %#v to externals\n", x))
 				DIDsWithFileInfoFromExternalHosts = append(DIDsWithFileInfoFromExternalHosts, x)
 			} else {
-				fmt.Printf("Added %#v to indexd list\n", x)
+				FuseLog(fmt.Sprintf("Added %#v to indexd list\n", x))
 				DIDsWithIndexdInfo = append(DIDsWithIndexdInfo, "\""+x+"\"")
 			}
 		}
@@ -874,7 +874,7 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 			return nil, err
 		}
 
-		fmt.Printf("\n\nnew and updated didToFileInfo: %#v\n", didToFileInfo)
+		FuseLog(fmt.Sprintf("\n\nnew and updated didToFileInfo: %#v\n", didToFileInfo))
 
 	}
 	return didToFileInfo, nil
