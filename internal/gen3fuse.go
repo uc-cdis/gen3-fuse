@@ -238,6 +238,9 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 			continue
 		}
 		filename := paths[len(paths)-1]
+		if len(fileInfo.Filename) > 0 {
+			filename = fileInfo.Filename
+		}
 		externalURLs := []string{}
 		if fileInfo.FromExternalHost {
 			externalURLs = fileInfo.URLs
