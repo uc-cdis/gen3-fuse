@@ -32,6 +32,8 @@ type Gen3Fuse struct {
 	inodes map[fuseops.InodeID]*inodeInfo
 
 	gen3FuseConfig *Gen3FuseConfig
+
+	ExternalIDPTokens map[string]string
 }
 
 type ManifestRecord struct {
@@ -88,8 +90,18 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		if err != nil {
 			return nil, err
 		}
-
 	}
+
+	for IDP, _ := range fs.ExternalIDPTokens {
+		token, err := GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
+		if err != nil {
+			FuseLog(fmt.Sprintf("Failed to retrieve access token from WTS for External Host IDP %v.", IDP))
+		}
+		fs.ExternalIDPTokens[IDP] = token
+		// TODO: delete this line
+		FuseLog(fmt.Sprintf("\nGot a token for %v - %v", IDP, token))
+	}
+
 
 	fs.inodes = InitializeInodes(didToFileInfo)
 	FuseLog("Initialized inodes")
@@ -347,6 +359,16 @@ func findChildInode(
 	return
 }
 
+func GetIDPForURL (url string) (IDP string) {
+	if strings.Contains(url, "jcoin") {
+		return "jcoin-google"
+	}
+	if strings.Contains(url, "healdata") {
+		return "externaldata-google"
+	}
+	return ""
+}
+
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	FuseLog(fmt.Sprintf("Inside LoadDIDsFromManifest, loading manifest from %v", manifestFilePath))
 	b, err := ioutil.ReadFile(manifestFilePath)
@@ -361,14 +383,26 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
 
-	fs.DIDsToCommonsHostnames = make(map[string]string)
 
+	fs.DIDsToCommonsHostnames = make(map[string]string)
+	fs.ExternalIDPTokens = make(map[string]string)
+	externalHostnames := make(map[string]string)
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
 		if len(manifestJSON[i].CommonsHostname) > 0 {
 			fs.DIDsToCommonsHostnames[manifestJSON[i].ObjectId] = manifestJSON[i].CommonsHostname
+			// Using a map as a set
+			externalHostnames[manifestJSON[i].CommonsHostname] = ""
 		}
 	}
+
+	for k, _ := range externalHostnames {
+		IDP := GetIDPForURL(k)
+		if len(IDP) > 0 {
+			fs.ExternalIDPTokens[IDP] = ""
+		}
+	}
+
 	return
 }
 
@@ -582,7 +616,18 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 		FuseLog("GET " + drsRequestURL)
 
 		req, err := http.NewRequest("GET", drsRequestURL, nil)
-		req.Header.Add("Authorization", "Bearer "+fs.accessToken)
+
+		accessToken := fs.accessToken
+		IDP := GetIDPForURL(drsRequestURL)
+		if len(IDP) < 1 {
+			FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
+		} else {
+			accessToken = fs.ExternalIDPTokens[IDP]
+			FuseLog(fmt.Sprintf("got an access token for IDP %v : %v", IDP, accessToken))
+		}
+		// TODO: delete this line
+
+		req.Header.Add("Authorization", "Bearer "+accessToken)
 		req.Header.Add("Accept", "application/json")
 
 		if err != nil {
@@ -602,10 +647,14 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 		} else if resp.StatusCode == 401 {
 			// refresh the access token and try again just one more time
 			FuseLog("Got 401, retrying...")
-			FuseLog("GET " + drsRequestURL)
+			accessToken, err = GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
+			if err != nil {
+				return "", err
+			}
 
+			FuseLog("GET " + drsRequestURL)
 			req, err := http.NewRequest("GET", drsRequestURL, nil)
-			req.Header.Add("Authorization", "Bearer "+fs.accessToken)
+			req.Header.Add("Authorization", "Bearer "+accessToken)
 			req.Header.Add("Accept", "application/json")
 
 			if err != nil {
@@ -623,7 +672,7 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 			if resp.StatusCode == 200 {
 				return fs.URLFromSuccessResponseFromJCOIN(resp), nil
 			} else {
-				FuseLog(fmt.Sprintf("After refreshing the access token, JCOIN still returns status code %d when asked for a presigned URL.", resp.StatusCode))
+				FuseLog(fmt.Sprintf("After refreshing the access token, external host %v still returns status code %d when asked for a presigned URL.", drsRequestURL, resp.StatusCode))
 				FuseLog("The full error page is below:\n")
 				bodyBytes, _ := ioutil.ReadAll(resp.Body)
 				bodyString := string(bodyBytes)
@@ -833,11 +882,6 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 
 		didToFileInfo[did] = fileInfo
 		FuseLog(fmt.Sprintf("\nINFO: fileInfo, %v", fileInfo))
-		fmt.Printf("\nfilename: %v", fileInfo.Filename)
-		fmt.Printf("\nfilesize: %v ", fileInfo.Filesize)
-		fmt.Printf("\nDID: %v ", fileInfo.DID)
-		fmt.Printf("\nURLs: %v ", fileInfo.URLs)
-		fmt.Printf("\nFromExternalHost: %v ", fileInfo.FromExternalHost)
 	}
 	return didToFileInfo, nil
 }
