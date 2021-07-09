@@ -278,7 +278,6 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		// this folder is already created in another guid lookup
 		_, ok := inodeIDMap[fullpath]
 		if ok {
-			FuseLog(fmt.Sprintf("%v Already exists", fullpath))
 			continue
 		}
 		parentNode, ok := inodeIDMap[parentpath]
@@ -621,7 +620,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 	} else {
 		accessToken = fs.ExternalIDPTokens[IDP]
 		// TODO: delete this line
-		FuseLog(fmt.Sprintf("got an access token for IDP %v : %v", IDP, accessToken))
+		FuseLog(fmt.Sprintf("got an access token for IDP %v: %v", IDP, accessToken))
 	}
 
 	req.Header.Add("Authorization", "Bearer "+accessToken)
@@ -639,7 +638,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 	}
 
 	// TODO: delete this line
-	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
+	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL %v: %v\n", drsRequestURL, resp))
 	if resp.StatusCode == 200 {
 		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
@@ -962,7 +961,7 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 			return nil, err
 		}
 
-		FuseLog(fmt.Sprintf("\n\nnew and updated didToFileInfo: %#v\n", didToFileInfo))
+		FuseLog(fmt.Sprintf("\nnew and updated didToFileInfo: %#v", didToFileInfo))
 
 	}
 	return didToFileInfo, nil
