@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"errors"
 
 	"bytes"
 	"net/http"
@@ -359,11 +360,11 @@ func findChildInode(
 	return
 }
 
-func GetIDPForURL(url string) (IDP string) {
-	if strings.Contains(url, "jcoin") {
+func GetIDPForURL(URL string) (IDP string) {
+	if strings.Contains(URL, "jcoin") {
 		return "jcoin-google"
 	}
-	if strings.Contains(url, "healdata") {
+	if strings.Contains(URL, "healdata") {
 		return "externaldata-google"
 	}
 	return ""
@@ -606,7 +607,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 	DID := info.DID
 	if len(info.ExternalAccessURLs) < 1 {
 		FuseLog(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
-		return "", err
+		return "", errors.New(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
 	}
 	drsRequestURL := info.ExternalAccessURLs[0]
 	FuseLog("GET " + drsRequestURL)
@@ -619,9 +620,9 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
 	} else {
 		accessToken = fs.ExternalIDPTokens[IDP]
+		// TODO: delete this line
 		FuseLog(fmt.Sprintf("got an access token for IDP %v : %v", IDP, accessToken))
 	}
-	// TODO: delete this line
 
 	req.Header.Add("Authorization", "Bearer "+accessToken)
 	req.Header.Add("Accept", "application/json")
@@ -637,6 +638,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		return "", err
 	}
 
+	// TODO: delete this line
 	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 	if resp.StatusCode == 200 {
 		return fs.URLFromSuccessResponseFromJCOIN(resp), nil
@@ -664,6 +666,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 			return "", err
 		}
 
+		// TODO: delete this line
 		FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
 			return fs.URLFromSuccessResponseFromJCOIN(resp), nil
