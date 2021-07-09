@@ -103,7 +103,6 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		FuseLog(fmt.Sprintf("\nGot a token for %v - %v", IDP, token))
 	}
 
-
 	fs.inodes = InitializeInodes(didToFileInfo)
 	FuseLog("Initialized inodes")
 	return fs, nil
@@ -360,7 +359,7 @@ func findChildInode(
 	return
 }
 
-func GetIDPForURL (url string) (IDP string) {
+func GetIDPForURL(url string) (IDP string) {
 	if strings.Contains(url, "jcoin") {
 		return "jcoin-google"
 	}
@@ -383,7 +382,6 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 
 	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
-
 
 	fs.DIDsToCommonsHostnames = make(map[string]string)
 	fs.ExternalIDPTokens = make(map[string]string)
@@ -800,7 +798,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		did := didsWithExternalInfo[i]
 		commonsHostname := fs.DIDsToCommonsHostnames[did]
 		// For now, we assume that all entries with a commons_url support the DRS API.
-		if commonsHostname[len(commonsHostname) - 1:] != "/" {
+		if commonsHostname[len(commonsHostname)-1:] != "/" {
 			commonsHostname = commonsHostname + "/"
 		}
 		drsRequestURL := commonsHostname + "ga4gh/drs/v1/objects/" + did
