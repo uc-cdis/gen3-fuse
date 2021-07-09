@@ -641,7 +641,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 	// TODO: delete this line
 	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 	if resp.StatusCode == 200 {
-		return fs.URLFromSuccessResponseFromJCOIN(resp), nil
+		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
 		// refresh the access token and try again just one more time
 		FuseLog("Got 401, retrying...")
@@ -669,7 +669,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		// TODO: delete this line
 		FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
-			return fs.URLFromSuccessResponseFromJCOIN(resp), nil
+			return fs.URLFromSuccessResponse(resp), nil
 		} else {
 			FuseLog(fmt.Sprintf("After refreshing the access token, external host %v still returns status code %d when asked for a presigned URL.", drsRequestURL, resp.StatusCode))
 			FuseLog("The full error page is below:\n")
@@ -693,7 +693,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		return fs.URLFromSuccessResponseFromFence(resp), nil
+		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
 		// refresh the access token and try again just one more time
 		FuseLog("Got 401, retrying...")
@@ -709,7 +709,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 		defer respRetry.Body.Close()
 
 		if resp.StatusCode == 200 {
-			return fs.URLFromSuccessResponseFromFence(resp), nil
+			return fs.URLFromSuccessResponse(resp), nil
 		}
 	}
 
@@ -773,17 +773,7 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 	return resp, nil
 }
 
-func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	bodyString := string(bodyBytes)
-
-	var urlResponse presignedURLResponse
-	json.Unmarshal([]byte(bodyString), &urlResponse)
-	return urlResponse.Url
-}
-
-func (fs *Gen3Fuse) URLFromSuccessResponseFromJCOIN(resp *http.Response) (presignedUrl string) {
-	// TODO: verify that the JCOIN presigned URL response structure matches the parse format here.
+func (fs *Gen3Fuse) URLFromSuccessResponse(resp *http.Response) (presignedUrl string) {
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 
