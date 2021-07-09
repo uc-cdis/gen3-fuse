@@ -96,6 +96,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		token, err := GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
 		if err != nil {
 			FuseLog(fmt.Sprintf("Failed to retrieve access token from WTS for External Host IDP %v.", IDP))
+			continue
 		}
 		fs.ExternalIDPTokens[IDP] = token
 		// TODO: delete this line
@@ -399,6 +400,7 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	for k, _ := range externalHostnames {
 		IDP := GetIDPForURL(k)
 		if len(IDP) > 0 {
+			// Initializing the keys of the IDP->Token map
 			fs.ExternalIDPTokens[IDP] = ""
 		}
 	}
@@ -601,32 +603,55 @@ type presignedURLResponse struct {
 	Url string
 }
 
-func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
-	FuseLog("Inside GetPresignedURL")
-
+func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedUrl string, err error) {
+	// The below code talks to the DRS API instead of Fence to get a presigned URL
 	DID := info.DID
+	if len(info.ExternalAccessURLs) < 1 {
+		FuseLog(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
+		return "", err
+	}
+	drsRequestURL := info.ExternalAccessURLs[0]
+	FuseLog("GET " + drsRequestURL)
 
-	if info.FromExternalHost == true {
-		// The below code talks to the DRS API instead of Fence to get a presigned URL
-		if len(info.ExternalAccessURLs) < 1 {
-			FuseLog(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
+	req, err := http.NewRequest("GET", drsRequestURL, nil)
+
+	accessToken := fs.accessToken
+	IDP := GetIDPForURL(drsRequestURL)
+	if len(IDP) < 1 {
+		FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
+	} else {
+		accessToken = fs.ExternalIDPTokens[IDP]
+		FuseLog(fmt.Sprintf("got an access token for IDP %v : %v", IDP, accessToken))
+	}
+	// TODO: delete this line
+
+	req.Header.Add("Authorization", "Bearer "+accessToken)
+	req.Header.Add("Accept", "application/json")
+
+	if err != nil {
+		FuseLog(err.Error() + " (" + DID + ") ")
+		return "", err
+	}
+	resp, err := myClient.Do(req)
+
+	if err != nil {
+		FuseLog(err.Error() + " (" + DID + ") ")
+		return "", err
+	}
+
+	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
+	if resp.StatusCode == 200 {
+		return fs.URLFromSuccessResponseFromJCOIN(resp), nil
+	} else if resp.StatusCode == 401 {
+		// refresh the access token and try again just one more time
+		FuseLog("Got 401, retrying...")
+		accessToken, err = GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
+		if err != nil {
 			return "", err
 		}
-		drsRequestURL := info.ExternalAccessURLs[0]
+
 		FuseLog("GET " + drsRequestURL)
-
 		req, err := http.NewRequest("GET", drsRequestURL, nil)
-
-		accessToken := fs.accessToken
-		IDP := GetIDPForURL(drsRequestURL)
-		if len(IDP) < 1 {
-			FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
-		} else {
-			accessToken = fs.ExternalIDPTokens[IDP]
-			FuseLog(fmt.Sprintf("got an access token for IDP %v : %v", IDP, accessToken))
-		}
-		// TODO: delete this line
-
 		req.Header.Add("Authorization", "Bearer "+accessToken)
 		req.Header.Add("Accept", "application/json")
 
@@ -644,45 +669,20 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 		FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
 			return fs.URLFromSuccessResponseFromJCOIN(resp), nil
-		} else if resp.StatusCode == 401 {
-			// refresh the access token and try again just one more time
-			FuseLog("Got 401, retrying...")
-			accessToken, err = GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
-			if err != nil {
-				return "", err
-			}
-
-			FuseLog("GET " + drsRequestURL)
-			req, err := http.NewRequest("GET", drsRequestURL, nil)
-			req.Header.Add("Authorization", "Bearer "+accessToken)
-			req.Header.Add("Accept", "application/json")
-
-			if err != nil {
-				FuseLog(err.Error() + " (" + DID + ") ")
-				return "", err
-			}
-			resp, err := myClient.Do(req)
-
-			if err != nil {
-				FuseLog(err.Error() + " (" + DID + ") ")
-				return "", err
-			}
-
-			FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
-			if resp.StatusCode == 200 {
-				return fs.URLFromSuccessResponseFromJCOIN(resp), nil
-			} else {
-				FuseLog(fmt.Sprintf("After refreshing the access token, external host %v still returns status code %d when asked for a presigned URL.", drsRequestURL, resp.StatusCode))
-				FuseLog("The full error page is below:\n")
-				bodyBytes, _ := ioutil.ReadAll(resp.Body)
-				bodyString := string(bodyBytes)
-				FuseLog(bodyString)
-				return "", nil
-			}
+		} else {
+			FuseLog(fmt.Sprintf("After refreshing the access token, external host %v still returns status code %d when asked for a presigned URL.", drsRequestURL, resp.StatusCode))
+			FuseLog("The full error page is below:\n")
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			bodyString := string(bodyBytes)
+			FuseLog(bodyString)
+			return "", nil
 		}
-		return "", nil
 	}
+	return "", nil
+}
 
+func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl string, err error) {
+	DID := info.DID
 	// The below code talks to the Fence microservice (case where info.FromExternalHost == false)
 	resp, err := fs.FetchURLResponseFromFence(DID)
 	if err != nil {
@@ -713,6 +713,15 @@ func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err e
 	}
 
 	return "", fs.HandleFenceError(resp)
+}
+
+func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
+	FuseLog("Inside GetPresignedURL")
+	if info.FromExternalHost == true {
+		return fs.GetPresignedURLFromExternalHost(info)
+	} else {
+		return fs.GetPresignedURLFromFence(info)
+	}
 }
 
 func (fs *Gen3Fuse) HandleFenceError(resp *http.Response) (err error) {
@@ -844,6 +853,10 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 			fileInfo.Filesize = uint64(size)
 		}
 
+		// The below code indexes deeper into the DRS API response to obtain access information.
+		// Because we unmarshalled the JSON without specifying a fixed structure, we test
+		// the type of each nested value before indexing deeper into the value.
+		// The result is verbose.
 		accessMethods, ok := jsonMap["access_methods"].([](interface{}))
 		accessMethodsMap, ok := accessMethods[0].(map[string]interface{})
 		accessMethod := ""
