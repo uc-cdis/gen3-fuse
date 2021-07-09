@@ -95,6 +95,28 @@ If you've already performed the Gen3Fuse setup instructions listed above, you ca
 
 The Gen3 workspace flow uses the Gen3Fuse sidecar to handle mounting files to the workspace. The sidecar code iterates through the IDPs made available by the workspace-token-service, obtains an access token from the WTS for the current user, and checks whether the user has uploaded a new manifest via the IDP's [manifest-service](https://github.com/uc-cdis/manifestservice). If it's the case, the Gen3Fuse CLI is then used to mount the files to the workspace.
 
+## External Hosts and the DRS API
+
+Manifest entries can optionally contain a `commons_url` field, indicating that the object ID in question points to a record in an external host -- that is, a host other than the URL specified in the Gen3Fuse command line parameter. This functionality allows for a workspace user in one commons to mount files indexed in  external data repositories. External hosts are expected to support the [Data Repository Service API](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-0.1.0/docs/). To enable interaction with external hosts, the Workspace Token Service of the FUSE host should be configured to serve access tokens for each external IDP. Below is an example of how a manifest containing files from external hosts might look:
+
+    [
+        {
+            "object_id": "ab.0000/1234-5678",
+            "commons_url": "https://science.datacommons.io/"
+          },
+          {
+            // This entry lacks the commons_url field, so it will
+            // be retrieved from the FUSE commons indexd
+            "object_id": "ab.0001/1234-5678"
+          },
+          {
+            "object_id": "ab.0002/1234-5678",
+            "commons_url": "https://external.sciencedata.org"
+          }
+        ]
+
+
+
 ## Performance tests
 Below are the results of a set of performance tests. Each chosen x axis value was tested 5 times, the results are shown in the scatter.
 
