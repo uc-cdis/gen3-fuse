@@ -105,8 +105,6 @@ Manifest entries can optionally contain a `commons_url` field, indicating that t
             "commons_url": "https://science.datacommons.io/"
           },
           {
-            // This entry lacks the commons_url field, so it will
-            // be retrieved from the FUSE commons indexd
             "object_id": "ab.0001/1234-5678"
           },
           {
@@ -115,6 +113,7 @@ Manifest entries can optionally contain a `commons_url` field, indicating that t
           }
         ]
 
+Presigned URLs for entries that lack the commons_url field, like `ab.0001/1234-5678` in the example above, will be retrieved from the FUSE commons Fence like usual.
 
 
 ## Performance tests
