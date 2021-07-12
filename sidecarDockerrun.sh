@@ -42,10 +42,16 @@ run_sidecar() {
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
-        for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-            IDPS+=( $(_jq ${ROW} .idp) )
-            BASE_URLS+=( $(_jq ${ROW} .base_url) )
-        done
+
+        # Temporarily omitting external IDPs from the mount folders.
+        # For now, external IDP data will be mounted in the same FUSE folder
+        # as the original host.
+        echo "Skipping folder creation for ${EXTERNAL_OIDC[@]}"
+
+        # for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
+        #     IDPS+=( $(_jq ${ROW} .idp) )
+        #     BASE_URLS+=( $(_jq ${ROW} .base_url) )
+        # done
         echo "WTS IDPs: ${IDPS[@]}"
 
         for i in "${!IDPS[@]}"; do
