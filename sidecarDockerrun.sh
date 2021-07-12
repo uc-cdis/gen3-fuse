@@ -1,5 +1,13 @@
 #!/bin/bash
 
+mkdir /data/preprod.healdata.org/
+touch /data/preprod.healdata.org/log.out
+
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>/data/preprod.healdata.org/log.out 2>&1
+
+
 # Only the most recent manifest is mounted.
 # If new manifests are added while the workspace is running,
 # only keep the N latest manifests for each IDP:
