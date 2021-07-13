@@ -43,10 +43,16 @@ while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
 done
 
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
-echo "got token from WTS: $TOKEN_JSON"
+
 run_sidecar() {
     while true; do
+        token=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
+        if [[ ! -z "$token" ]]; then
+            echo "got new token $token"
+            TOKEN_JSON['default']=$token
+        fi
+
+        echo "got token from WTS: $TOKEN_JSON"
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
