@@ -154,8 +154,8 @@ check_for_new_manifests() {
     # echo "querying manifest service at $BASE_URL/manifests/"
     echo "querying manifest service at http://manifestservice-service.$NAMESPACE/manifests/"
     resp='' # The below function populates this variable
-    # query_manifest_service $BASE_URL/manifests/
-    query_manifest_service http://manifestservice-service.$NAMESPACE/manifests/
+    query_manifest_service $BASE_URL/manifests/
+    # query_manifest_service http://manifestservice-service.$NAMESPACE/manifests/
 
 
     # get the name of the most recent manifest
