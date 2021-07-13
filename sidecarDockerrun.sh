@@ -33,7 +33,7 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
-
+echo "WTS_OVERRIDE_URL: $WTS_OVERRIDE_URL"
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
 echo "WTS STATUS: $WTS_STATUS"
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
@@ -44,7 +44,7 @@ done
 
 declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
-
+echo "got token from WTS: $TOKEN_JSON"
 run_sidecar() {
     while true; do
         # get the list of IDPs the current user is logged into
@@ -144,10 +144,11 @@ check_for_new_manifests() {
     resp='' # The below function populates this variable
     # query_manifest_service $BASE_URL/manifests/
     query_manifest_service http://manifestservice.$NAMESPACE/manifests/
-    echo "response from the manifest service: $resp"
+    echo "response from the manifest service /manifests: $resp"
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
+    echo "most recent manifest name: $MANIFEST_NAME"
     if [[ $? != 0 ]]; then
         echo "Manifest service endpoint at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
         return
