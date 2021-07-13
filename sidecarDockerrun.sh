@@ -53,6 +53,9 @@ run_sidecar() {
         fi
 
         echo "got token from WTS: ${TOKEN_JSON['default']}"
+        wts_response=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default)
+        echo "wts response: $wts_response"
+
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
