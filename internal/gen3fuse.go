@@ -639,7 +639,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 	}
 
 	// TODO: delete this line
-	FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL %v: %v\n", drsRequestURL, resp))
+	FuseLog(fmt.Sprintf("\n\nresponse from drsRequestURL %v: %v\n", drsRequestURL, resp))
 	if resp.StatusCode == 200 {
 		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
@@ -667,7 +667,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		}
 
 		// TODO: delete this line
-		FuseLog(fmt.Sprintf("\n\nresponse from JCOIN drsRequestURL: %v\n", resp))
+		FuseLog(fmt.Sprintf("\n\nresponse from drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
 			return fs.URLFromSuccessResponse(resp), nil
 		} else {
@@ -720,7 +720,9 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
 	FuseLog("Inside GetPresignedURL")
 	if info.FromExternalHost == true {
-		return fs.GetPresignedURLFromExternalHost(info)
+		rv, err := fs.GetPresignedURLFromExternalHost(info)
+		FuseLog(fmt.Sprintf("got url from external host %s", rv))
+		return rv, err
 	} else {
 		return fs.GetPresignedURLFromFence(info)
 	}
