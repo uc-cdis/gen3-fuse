@@ -139,10 +139,12 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-    echo "querying manifest service at $BASE_URL/manifests/"
+    # echo "querying manifest service at $BASE_URL/manifests/"
+    echo "querying manifest service at http://manifestservice.$NAMESPACE/manifests/"
     resp='' # The below function populates this variable
-    query_manifest_service $BASE_URL/manifests/
-    echo "response from manifest service: $resp"
+    # query_manifest_service $BASE_URL/manifests/
+    query_manifest_service http://manifestservice.$NAMESPACE/manifests/
+    echo "response from the manifest service: $resp"
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
