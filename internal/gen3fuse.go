@@ -602,6 +602,7 @@ type presignedURLResponse struct {
 }
 
 func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedUrl string, err error) {
+	FuseLog(fmt.Sprintf("Inside GetPresignedURLFromExternalHost with %s", info.DID))
 	// The below code talks to the DRS API instead of Fence to get a presigned URL
 	DID := info.DID
 	if len(info.ExternalAccessURLs) < 1 {
@@ -682,6 +683,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 }
 
 func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl string, err error) {
+	FuseLog(fmt.Sprintf("Inside GetPresignedURLFromFence with %s", info.DID))
 	DID := info.DID
 	// The below code talks to the Fence microservice (case where info.FromExternalHost == false)
 	resp, err := fs.FetchURLResponseFromFence(DID)
