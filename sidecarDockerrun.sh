@@ -35,6 +35,7 @@ sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-st
 trap cleanup SIGTERM
 
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+echo "WTS STATUS: $WTS_STATUS"
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
     echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
     sleep 15
@@ -55,6 +56,8 @@ run_sidecar() {
         # For now, external IDP data will be mounted in the same FUSE folder
         # as the original host.
         echo "Skipping folder creation for ${EXTERNAL_OIDC[@]}"
+        echo "currently in NAMESPACE: $NAMESPACE"
+        echo "current HOSTNAME: $HOSTNAME"
 
         # for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
         #     IDPS+=( $(_jq ${ROW} .idp) )
@@ -136,9 +139,10 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-
+    echo "querying manifest service at $BASE_URL/manifests/"
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
+    echo "response from manifest service: $resp"
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
