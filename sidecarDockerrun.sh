@@ -52,7 +52,7 @@ run_sidecar() {
             TOKEN_JSON['default']=$token
         fi
 
-        echo "got token from WTS: $TOKEN_JSON"
+        echo "got token from WTS: ${TOKEN_JSON['default']}"
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
@@ -105,13 +105,16 @@ query_manifest_service() {
     # This function populates a return value in a variable called $resp
     URL=$1
 
-    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" )
 
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP | jq -r '.token')
+        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+
+        resp2=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+        echo "response from the manifest service /manifests resp2: $resp2"
     fi
 }
 
@@ -150,7 +153,7 @@ check_for_new_manifests() {
     resp='' # The below function populates this variable
     # query_manifest_service $BASE_URL/manifests/
     query_manifest_service http://manifestservice.$NAMESPACE/manifests/
-    echo "response from the manifest service /manifests: $resp"
+
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
