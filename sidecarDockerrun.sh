@@ -108,7 +108,8 @@ query_manifest_service() {
     # This function populates a return value in a variable called $resp
     URL=$1
 
-    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" )
+    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+    echo "manifest service response: $resp"
 
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
