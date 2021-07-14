@@ -923,57 +923,60 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 			}
 		}
 
-		postData := "[ " + strings.Join(DIDsWithIndexdInfo, ",") + " ]"
+		if len(DIDsWithIndexdInfo) > 0 {
+			postData := "[ " + strings.Join(DIDsWithIndexdInfo, ",") + " ]"
 
-		FuseLog(fmt.Sprintf("POST %v with %v records from window %v - %v", indexdRequestURL, len(DIDsWithIndexdInfo), i, last))
+			FuseLog(fmt.Sprintf("POST %v with %v records from window %v - %v", indexdRequestURL, len(DIDsWithIndexdInfo), i, last))
 
-		// Decent timeout because there might be lots of files to list
-		timeout := time.Duration(60 * time.Second)
-		client := http.Client{
-			Timeout: timeout,
+			// Decent timeout because there might be lots of files to list
+			timeout := time.Duration(60 * time.Second)
+			client := http.Client{
+				Timeout: timeout,
+			}
+
+			req, err := http.NewRequest("POST", indexdRequestURL, bytes.NewBuffer([]byte(postData)))
+			req.Header.Set("Content-Type", "application/json")
+
+			if err != nil {
+				FuseLog(err.Error())
+				return nil, err
+			}
+			resp, err := client.Do(req)
+
+			if err != nil {
+				FuseLog(err.Error())
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				return nil, fs.HandleIndexdError(resp)
+
+			}
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			bodyString := string(bodyBytes)
+
+			didToFileInfoList := make([]*FileInfo, 0)
+			json.Unmarshal([]byte(bodyString), &didToFileInfoList)
+
+			for _, fileInfo := range didToFileInfoList {
+				didToFileInfo[fileInfo.DID] = fileInfo
+			}
 		}
 
-		req, err := http.NewRequest("POST", indexdRequestURL, bytes.NewBuffer([]byte(postData)))
-		req.Header.Set("Content-Type", "application/json")
+		if len(DIDsWithFileInfoFromExternalHosts) > 0 {
+			// Now get the DRS file infos
+			// drsFileInfos := fs.GetExternalHostFileInfos(didsWithExternalInfo)
+			didToFileInfo, err = fs.GetExternalHostFileInfos(DIDsWithFileInfoFromExternalHosts, didToFileInfo)
 
-		if err != nil {
-			FuseLog(err.Error())
-			return nil, err
+			if err != nil {
+				FuseLog(fmt.Sprintf("Error: failed to retrieve external host file infos. %v ", err))
+				return nil, err
+			}
+
+			FuseLog(fmt.Sprintf("\nnew and updated didToFileInfo: %#v", didToFileInfo))
 		}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			FuseLog(err.Error())
-			return nil, err
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return nil, fs.HandleIndexdError(resp)
-
-		}
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
-		bodyString := string(bodyBytes)
-
-		didToFileInfoList := make([]*FileInfo, 0)
-		json.Unmarshal([]byte(bodyString), &didToFileInfoList)
-
-		for _, fileInfo := range didToFileInfoList {
-			didToFileInfo[fileInfo.DID] = fileInfo
-		}
-
-		// Now get the DRS file infos
-		// drsFileInfos := fs.GetExternalHostFileInfos(didsWithExternalInfo)
-		didToFileInfo, err = fs.GetExternalHostFileInfos(DIDsWithFileInfoFromExternalHosts, didToFileInfo)
-
-		if err != nil {
-			FuseLog(fmt.Sprintf("Error: failed to retrieve external host file infos. %v ", err))
-			return nil, err
-		}
-
-		FuseLog(fmt.Sprintf("\nnew and updated didToFileInfo: %#v", didToFileInfo))
-
 	}
 	return didToFileInfo, nil
 }
