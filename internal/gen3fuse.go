@@ -798,7 +798,13 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		if commonsHostname[len(commonsHostname)-1:] != "/" {
 			commonsHostname = commonsHostname + "/"
 		}
+		// The data in the agg MDS needs to be standardized...
+		if ! (strings.HasPrefix(commonsHostname, "http://") && strings.HasPrefix(commonsHostname, "https://")) {
+			commonsHostname = "https://" + commonsHostname
+		}
+
 		drsRequestURL := commonsHostname + "ga4gh/drs/v1/objects/" + did
+		fmt.Println(drsRequestURL)
 
 		timeout := time.Duration(4 * time.Second)
 		client := http.Client{
