@@ -719,7 +719,8 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 
 func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
 	FuseLog("Inside GetPresignedURL")
-	if info.FromExternalHost == true {
+	FuseLog(fmt.Sprintf("\n> with fileInfo: %v", info))
+	if info.FromExternalHost {
 		rv, err := fs.GetPresignedURLFromExternalHost(info)
 		FuseLog("got url from external host")
 		FuseLog(rv)
