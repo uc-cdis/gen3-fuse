@@ -237,10 +237,15 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 			continue
 		}
 
+		externalURLs := []string{}
+		if fileInfo.FromExternalHost {
+			externalURLs = fileInfo.URLs
+		}
+
 		// inode for by-id file
 		// GUIDs can have prefix as folders
 		guidPaths := append([]string{"by-guid"}, strings.Split(did, "/")...)
-		inodeID = createInodeForDirs(inodes, inodeID, guidPaths, inodeIDMap, did, fileInfo.Filesize)
+		inodeID = createInodeForDirs(inodes, inodeID, guidPaths, inodeIDMap, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 
 		inodeID++
 
@@ -258,19 +263,16 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 		if len(fileInfo.Filename) > 0 {
 			filename = fileInfo.Filename
 		}
-		externalURLs := []string{}
-		if fileInfo.FromExternalHost {
-			externalURLs = fileInfo.URLs
-		}
+
 		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 		inodeID++
 		paths = append([]string{"by-filepath"}, paths...)
-		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize)
+		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 	}
 	return inodes
 }
 
-func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.InodeID, paths []string, inodeIDMap map[string]fuseops.InodeID, did string, filesize uint64) fuseops.InodeID {
+func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.InodeID, paths []string, inodeIDMap map[string]fuseops.InodeID, did string, filesize uint64, fromExternalHost bool, externalURLs []string) fuseops.InodeID {
 	for i := 0; i <= len(paths)-1; i++ {
 		filename := paths[i]
 		fullpath := strings.Join(paths[0:i+1], "/")
@@ -287,7 +289,7 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		}
 		if i == len(paths)-1 {
 			// leaf file
-			createInode(inodes, parentNode, inodeID, filename, did, filesize, false, nil)
+			createInode(inodes, parentNode, inodeID, filename, did, filesize, fromExternalHost, externalURLs)
 		} else {
 			// intermediate directory
 			createInode(inodes, parentNode, inodeID, filename, "", 0, false, nil)
@@ -720,6 +722,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
 	FuseLog("Inside GetPresignedURL")
 	FuseLog(fmt.Sprintf("\n> with fileInfo: %v", info))
+	FuseLog(fmt.Sprintf("\nFor this DID, FromExternalHost = %v", info.FromExternalHost))
 	if info.FromExternalHost {
 		rv, err := fs.GetPresignedURLFromExternalHost(info)
 		FuseLog("got url from external host")
