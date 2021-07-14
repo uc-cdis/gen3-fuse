@@ -66,7 +66,7 @@ func SetUpTestData(t *testing.T) (gen3FuseConfig *gen3fuse.Gen3FuseConfig) {
 
 func TestEmptyManifest(t *testing.T) {
 	gen3FuseConfig, err := gen3fuse.NewGen3FuseConfigFromYaml("../local-config.yaml")
-	
+
 	gen3FuseConfig.Hostname = *hostnameFlag
 	gen3FuseConfig.WTSBaseURL = *wtsURLFlag
 	manifestBody1 := ""
@@ -176,7 +176,7 @@ func TestReadFile(t *testing.T) {
 	}
 	s := string(buf)
 
-	expected_contents := "this file lives in s3://devplanetv1-proj1-databucket-gen3 bucket, with corresponding records \n" + 
+	expected_contents := "this file lives in s3://devplanetv1-proj1-databucket-gen3 bucket, with corresponding records \n" +
 	"in the index_record, index_record_url, index_record_url_metadata, index_record_metadata, and index_record_ace tables\n"
 
 	if s != expected_contents {
@@ -221,16 +221,16 @@ func TestOpenFileNonexistent(t *testing.T) {
 
 func TestInitializeInodesNoFilenameButURLProvided(t *testing.T) {
 	// Test the case where Indexd does not provide a filename but it does provide at least 1 URL
-	didToFileInfo := make(map[string]*gen3fuse.IndexdResponse, 0)
-	didToFileInfo["did-1"] = &gen3fuse.IndexdResponse{ 
-		Filesize : 1000, 
+	didToFileInfo := make(map[string]*gen3fuse.FileInfo, 0)
+	didToFileInfo["did-1"] = &gen3fuse.FileInfo{
+		Filesize : 1000,
 		Filename: "",
 		DID: "did-1",
 		URLs: []string{"s3://some-s3-bucket/s3test4.txt"},
 	}
-	
+
 	result := gen3fuse.InitializeInodes(didToFileInfo)
-	
+
 	var structStr string = fmt.Sprintf("%+v", result)
 	fmt.Println("\n InitInodes result: " + structStr + "\n")
 

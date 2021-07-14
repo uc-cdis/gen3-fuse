@@ -1,5 +1,13 @@
 #!/bin/bash
 
+mkdir /data/preprod.healdata.org/
+touch /data/preprod.healdata.org/log.out
+
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>/data/preprod.healdata.org/log.out 2>&1
+
+
 # Only the most recent manifest is mounted.
 # If new manifests are added while the workspace is running,
 # only keep the N latest manifests for each IDP:
@@ -25,8 +33,9 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
-
+echo "WTS_OVERRIDE_URL: $WTS_OVERRIDE_URL"
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+echo "WTS STATUS: $WTS_STATUS"
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
     echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
     sleep 15
@@ -34,18 +43,35 @@ while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
 done
 
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
 
 run_sidecar() {
     while true; do
+        token=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
+        if [[ ! -z "$token" ]]; then
+            echo "got new token $token"
+            TOKEN_JSON['default']=$token
+        fi
+
+        echo "got token from WTS: ${TOKEN_JSON['default']}"
+        wts_response=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default)
+        echo "wts response: $wts_response"
+
         # get the list of IDPs the current user is logged into
         EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
-        for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-            IDPS+=( $(_jq ${ROW} .idp) )
-            BASE_URLS+=( $(_jq ${ROW} .base_url) )
-        done
+
+        # Temporarily omitting external IDPs from the mount folders.
+        # For now, external IDP data will be mounted in the same FUSE folder
+        # as the original host.
+        echo "Skipping folder creation for ${EXTERNAL_OIDC[@]}"
+        echo "currently in NAMESPACE: $NAMESPACE"
+        echo "current HOSTNAME: $HOSTNAME"
+
+        # for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
+        #     IDPS+=( $(_jq ${ROW} .idp) )
+        #     BASE_URLS+=( $(_jq ${ROW} .base_url) )
+        # done
         echo "WTS IDPs: ${IDPS[@]}"
 
         for i in "${!IDPS[@]}"; do
@@ -82,13 +108,17 @@ query_manifest_service() {
     # This function populates a return value in a variable called $resp
     URL=$1
 
-    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+    echo "manifest service response: $resp"
 
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP | jq -r '.token')
+        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+
+        resp2=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+        echo "response from the manifest service /manifests resp2: $resp2"
     fi
 }
 
@@ -122,12 +152,16 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-
+    # echo "querying manifest service at $BASE_URL/manifests/"
+    echo "querying manifest service at http://manifestservice-service.$NAMESPACE/manifests/"
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
+    # query_manifest_service http://manifestservice-service.$NAMESPACE/manifests/
+
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
+    echo "most recent manifest name: $MANIFEST_NAME"
     if [[ $? != 0 ]]; then
         echo "Manifest service endpoint at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
         return
