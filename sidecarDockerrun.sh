@@ -54,14 +54,14 @@ declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$default_token
 run_sidecar() {
     while true; do
-        token=$(curl $WTS_URL/token/?idp=default 2>/dev/null | jq -r '.token')
+        token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}"  2>/dev/null | jq -r '.token')
         if [[ ! -z "$token" ]]; then
             echo "got new token $token"
             TOKEN_JSON['default']=$token
         fi
 
         echo "got token from WTS: ${TOKEN_JSON['default']}"
-        wts_response=$(curl $WTS_URL/token/?idp=default)
+        wts_response=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" )
         echo "wts response: $wts_response"
 
         # get the list of IDPs the current user is logged into
