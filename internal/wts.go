@@ -32,6 +32,9 @@ type Gen3FuseConfig struct {
 
 	// An optional parameter the user can provide to retrieve access tokens from Fence
 	ApiKey string
+
+	// An optional parameter the user can provide to talk to WTS from outside the k8s cluster
+	AccessToken string
 }
 
 func NewGen3FuseConfigFromYaml(filename string) (gen3FuseConfig *Gen3FuseConfig, err error) {
@@ -65,8 +68,13 @@ type fenceAccessTokenResponse struct {
 
 var myClient = &http.Client{Timeout: 20 * time.Second}
 
-func getJson(url string, target interface{}) (err error) {
-	r, err := myClient.Get(url)
+func getJson(url string, target interface{}, access_token string) (err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	// add authorization header to the req
+	if access_token != "" {
+		req.Header.Add("Authorization", "Bearer "+access_token)
+	}
+	r, err := myClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -134,7 +142,8 @@ func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig, idpInput string) (acc
 		requestUrl += "?idp=" + WTSIdp
 	}
 	tokenResponse := new(tokenResponse)
-	err = getJson(requestUrl, tokenResponse)
+	access_token := gen3FuseConfig.AccessToken
+	err = getJson(requestUrl, tokenResponse, access_token)
 
 	if len(tokenResponse.Token) == 0 || err != nil {
 		FuseLog("Error obtaining access token from the workspace token service at " + requestUrl)
