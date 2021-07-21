@@ -3,12 +3,12 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
-	"errors"
 
 	"bytes"
 	"net/http"
@@ -803,7 +803,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 			commonsHostname = commonsHostname + "/"
 		}
 		// The data in the agg MDS needs to be standardized...
-		if ! (strings.HasPrefix(commonsHostname, "http://") && strings.HasPrefix(commonsHostname, "https://")) {
+		if !(strings.HasPrefix(commonsHostname, "http://") && strings.HasPrefix(commonsHostname, "https://")) {
 			commonsHostname = "https://" + commonsHostname
 		}
 

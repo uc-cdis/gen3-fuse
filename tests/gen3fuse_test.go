@@ -2,12 +2,12 @@ package tests
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"testing"
 	"strings"
-	"flag"
+	"testing"
 
 	gen3fuse "gen3-fuse/internal"
 )
@@ -177,7 +177,7 @@ func TestReadFile(t *testing.T) {
 	s := string(buf)
 
 	expected_contents := "this file lives in s3://devplanetv1-proj1-databucket-gen3 bucket, with corresponding records \n" +
-	"in the index_record, index_record_url, index_record_url_metadata, index_record_metadata, and index_record_ace tables\n"
+		"in the index_record, index_record_url, index_record_url_metadata, index_record_metadata, and index_record_ace tables\n"
 
 	if s != expected_contents {
 		t.Errorf("Incorrect contents in file. Expected (%s) \n Found (%s) \n ", expected_contents, s)
@@ -223,10 +223,10 @@ func TestInitializeInodesNoFilenameButURLProvided(t *testing.T) {
 	// Test the case where Indexd does not provide a filename but it does provide at least 1 URL
 	didToFileInfo := make(map[string]*gen3fuse.FileInfo, 0)
 	didToFileInfo["did-1"] = &gen3fuse.FileInfo{
-		Filesize : 1000,
+		Filesize: 1000,
 		Filename: "",
-		DID: "did-1",
-		URLs: []string{"s3://some-s3-bucket/s3test4.txt"},
+		DID:      "did-1",
+		URLs:     []string{"s3://some-s3-bucket/s3test4.txt"},
 	}
 
 	result := gen3fuse.InitializeInodes(didToFileInfo)
