@@ -97,7 +97,7 @@ The Gen3 workspace flow uses the Gen3Fuse sidecar to handle mounting files to th
 
 ## External Hosts and the DRS API
 
-Manifest entries can optionally contain a `commons_url` field. This field indicates that the object ID in question points to a record in an external host -- that is, a host other than the URL specified in the Gen3Fuse command line parameter `hostname`. This functionality allows for users to mount files from multiple data repositories. External hosts are expected to support the [Data Repository Service API](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-0.1.0/docs/). To enable interaction with external hosts, the Workspace Token Service of the FUSE host should be configured to serve access tokens for each external IDP. Below is an example of a manifest containing files from multiple hosts:
+Manifest entries can optionally contain a `commons_url` field. This field indicates that the object ID in question points to a record in an external host -- that is, a host other than the URL specified in the Gen3Fuse command line parameter `hostname`. This functionality allows for users to mount files from multiple data repositories. External hosts are expected to support the [Data Repository Service API](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-0.1.0/docs/). To enable interaction with external hosts, the Workspace Token Service of the FUSE host should be configured to serve access tokens for each external IDP. Below is an example of a manifest containing files from multiple hosts. Note that various hostname formats are accepted.
 
     [
         {
@@ -109,7 +109,7 @@ Manifest entries can optionally contain a `commons_url` field. This field indica
           },
           {
             "object_id": "ab.0002/1234-5678",
-            "commons_url": "https://external.sciencedata.org"
+            "commons_url": "external.sciencedata.org"
           }
         ]
 

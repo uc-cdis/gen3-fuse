@@ -1,12 +1,13 @@
 #!/bin/bash
 
-mkdir /data/preprod.healdata.org/
-touch /data/preprod.healdata.org/log.out
-
+# The below commands allow for enhanced logging.
+# All output from this script will be captured in the file at /data/$HOSTNAME/fuse-sidecar-logs.out
+# Note that this log file will be visible to the workspace user.
+mkdir "/data/$HOSTNAME/"
+touch "/data/$HOSTNAME/fuse-sidecar-logs.out"
 exec 3>&1 4>&2
 trap 'exec 2>&4 1>&3' 0 1 2 3
-exec 1>/data/preprod.healdata.org/log.out 2>&1
-
+exec 1>"/data/$HOSTNAME/fuse-sidecar-logs.out" 2>&1
 
 # Only the most recent manifest is mounted.
 # If new manifests are added while the workspace is running,
@@ -61,17 +62,10 @@ run_sidecar() {
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
 
-        # Temporarily omitting external IDPs from the mount folders.
-        # For now, external IDP data will be mounted in the same FUSE folder
-        # as the original host.
-        echo "Skipping folder creation for ${EXTERNAL_OIDC[@]}"
-        echo "currently in NAMESPACE: $NAMESPACE"
-        echo "current HOSTNAME: $HOSTNAME"
-
-        # for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
-        #     IDPS+=( $(_jq ${ROW} .idp) )
-        #     BASE_URLS+=( $(_jq ${ROW} .base_url) )
-        # done
+        for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
+            IDPS+=( $(_jq ${ROW} .idp) )
+            BASE_URLS+=( $(_jq ${ROW} .base_url) )
+        done
         echo "WTS IDPs: ${IDPS[@]}"
 
         for i in "${!IDPS[@]}"; do
@@ -116,9 +110,7 @@ query_manifest_service() {
         echo "Getting new token for IDP '$IDP'"
         TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
-
-        resp2=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
-        echo "response from the manifest service /manifests resp2: $resp2"
+        echo "response from the manifest service $URL: $resp"
     fi
 }
 
@@ -152,12 +144,9 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-    # echo "querying manifest service at $BASE_URL/manifests/"
     echo "querying manifest service at http://manifestservice-service.$NAMESPACE/manifests/"
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
-    # query_manifest_service http://manifestservice-service.$NAMESPACE/manifests/
-
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)

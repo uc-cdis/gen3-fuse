@@ -100,7 +100,7 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 			continue
 		}
 		fs.ExternalIDPTokens[IDP] = token
-		// TODO: delete this line
+
 		FuseLog(fmt.Sprintf("\nGot a token for %v - %v", IDP, token))
 	}
 
@@ -164,8 +164,6 @@ func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*i
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
-
-	FuseLog(fmt.Sprintf("\n\ninside InitializeInodes with didToFileInfo : %#v\n\n", didToFileInfo))
 
 	FuseLog("Inside InitializeInodes")
 	const (
@@ -622,8 +620,8 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
 	} else {
 		accessToken = fs.ExternalIDPTokens[IDP]
-		// TODO: delete this line
-		FuseLog(fmt.Sprintf("got an access token for IDP %v: %v", IDP, accessToken))
+
+		FuseLog(fmt.Sprintf("Got an access token for IDP %v: %v", IDP, accessToken))
 	}
 
 	req.Header.Add("Authorization", "Bearer "+accessToken)
@@ -640,8 +638,8 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 		return "", err
 	}
 
-	// TODO: delete this line
-	FuseLog(fmt.Sprintf("\n\nresponse from drsRequestURL %v: %v\n", drsRequestURL, resp))
+
+	FuseLog(fmt.Sprintf("Response from drsRequestURL %v: %v\n", drsRequestURL, resp))
 	if resp.StatusCode == 200 {
 		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
@@ -668,8 +666,7 @@ func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedU
 			return "", err
 		}
 
-		// TODO: delete this line
-		FuseLog(fmt.Sprintf("\n\nresponse from drsRequestURL: %v\n", resp))
+		FuseLog(fmt.Sprintf("Response from drsRequestURL: %v\n", resp))
 		if resp.StatusCode == 200 {
 			return fs.URLFromSuccessResponse(resp), nil
 		} else {
@@ -720,12 +717,9 @@ func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl stri
 }
 
 func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
-	FuseLog("Inside GetPresignedURL")
-	FuseLog(fmt.Sprintf("\n> with fileInfo: %v", info))
-	FuseLog(fmt.Sprintf("\nFor this DID, FromExternalHost = %v", info.FromExternalHost))
 	if info.FromExternalHost {
 		rv, err := fs.GetPresignedURLFromExternalHost(info)
-		FuseLog("got url from external host")
+		FuseLog("Got url from external host")
 		FuseLog(rv)
 		return rv, err
 	} else {
@@ -802,7 +796,7 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		if commonsHostname[len(commonsHostname)-1:] != "/" {
 			commonsHostname = commonsHostname + "/"
 		}
-		// The data in the agg MDS needs to be standardized...
+		// Flexibility with hostname formats
 		if !(strings.HasPrefix(commonsHostname, "http://") && strings.HasPrefix(commonsHostname, "https://")) {
 			commonsHostname = "https://" + commonsHostname
 		}
@@ -899,7 +893,6 @@ func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didT
 		}
 
 		didToFileInfo[did] = fileInfo
-		FuseLog(fmt.Sprintf("\nINFO: fileInfo, %v", fileInfo))
 	}
 	return didToFileInfo, nil
 }
@@ -971,15 +964,12 @@ func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, 
 
 		if len(DIDsWithFileInfoFromExternalHosts) > 0 {
 			// Now get the DRS file infos
-			// drsFileInfos := fs.GetExternalHostFileInfos(didsWithExternalInfo)
 			didToFileInfo, err = fs.GetExternalHostFileInfos(DIDsWithFileInfoFromExternalHosts, didToFileInfo)
 
 			if err != nil {
 				FuseLog(fmt.Sprintf("Error: failed to retrieve external host file infos. %v ", err))
 				return nil, err
 			}
-
-			FuseLog(fmt.Sprintf("\nnew and updated didToFileInfo: %#v", didToFileInfo))
 		}
 	}
 	return didToFileInfo, nil
