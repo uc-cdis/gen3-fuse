@@ -34,6 +34,7 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
+WTS_URL="http://workspace-token-service.$NAMESPACE"
 WTS_URL=${WTS_OVERRIDE_URL:-"$WTS_URL"}
 echo "WTS_URL: $WTS_URL"
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
