@@ -151,6 +151,7 @@ mount_manifest() {
                 echo "gen3-fuse failed to mount."
             fi
         else
+            # When we are launching workspaces outside local kubernetes cluster, we need to supply an access token so fuse can talk to WTS
             if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP -access-token=$ACCESS_TOKEN >/proc/1/fd/1 2>/proc/1/fd/2); then
                 echo "gen3-fuse failed to mount."
             fi
