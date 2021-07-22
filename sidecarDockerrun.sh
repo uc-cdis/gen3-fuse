@@ -34,31 +34,39 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
-echo "WTS_OVERRIDE_URL: $WTS_OVERRIDE_URL"
-WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+WTS_URL=${WTS_OVERRIDE_URL:-"$WTS_URL"}
+echo "WTS_URL: $WTS_URL"
+WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 echo "WTS STATUS: $WTS_STATUS"
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
-    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
+    echo "Unable to reach WTS at '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
     sleep 15
-    WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+    WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 done
 
+default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+while [[ "$default_token" = null ]]; do
+    echo "Unable to get token from '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
+    echo $default_token
+    sleep 15
+    default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+done
 declare -A TOKEN_JSON  # requires Bash 4
-
+TOKEN_JSON['default']=$default_token
 run_sidecar() {
     while true; do
-        token=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
+        token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}"  2>/dev/null | jq -r '.token')
         if [[ ! -z "$token" ]]; then
             echo "got new token $token"
             TOKEN_JSON['default']=$token
         fi
 
         echo "got token from WTS: ${TOKEN_JSON['default']}"
-        wts_response=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default)
+        wts_response=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" )
         echo "wts response: $wts_response"
 
         # get the list of IDPs the current user is logged into
-        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
+        EXTERNAL_OIDC=$(curl $WTS_URL/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
 
@@ -108,7 +116,7 @@ query_manifest_service() {
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP | jq -r '.token')
+        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${ACCESS_TOKEN}" | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
         echo "response from the manifest service $URL: $resp"
     fi
@@ -134,7 +142,9 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
-        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP -access-token=$ACCESS_TOKEN >/proc/1/fd/1 2>/proc/1/fd/2); then
+            echo "gen3-fuse failed to mount."
+        fi
     fi
 }
 
@@ -144,9 +154,10 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-    echo "querying manifest service at http://manifestservice-service.$NAMESPACE/manifests/"
+    echo "querying manifest service at $BASE_URL/manifests/"
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
+
 
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
