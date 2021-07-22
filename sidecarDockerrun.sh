@@ -44,26 +44,29 @@ while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
     sleep 15
     WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 done
-
-default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+declare -a curlArgs
+if [ ! -z $WTS_OVERRIDE_URL ]; then
+    curlArgs=('-H' "Authorization: bearer ${ACCESS_TOKEN}")
+fi
+default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
 while [[ "$default_token" = null ]]; do
     echo "Unable to get token from '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
     echo $default_token
     sleep 15
-    default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+    default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
 done
 declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$default_token
 run_sidecar() {
     while true; do
-        token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}"  2>/dev/null | jq -r '.token')
+        token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}"  2>/dev/null | jq -r '.token')
         if [[ ! -z "$token" ]]; then
             echo "got new token $token"
             TOKEN_JSON['default']=$token
         fi
 
         echo "got token from WTS: ${TOKEN_JSON['default']}"
-        wts_response=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" )
+        wts_response=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" )
         echo "wts response: $wts_response"
 
         # get the list of IDPs the current user is logged into
@@ -117,7 +120,7 @@ query_manifest_service() {
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${ACCESS_TOKEN}" | jq -r '.token')
+        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${TOKEN_JSON['default']}" | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
         echo "response from the manifest service $URL: $resp"
     fi
