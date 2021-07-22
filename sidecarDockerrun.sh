@@ -146,6 +146,7 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
+        # Check if we have an ACCESS_TOKEN mounted, this only gets mounted for external workspace pods
         if [ -z $ACCESS_TOKEN ]; then
             if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2); then
                 echo "gen3-fuse failed to mount."
