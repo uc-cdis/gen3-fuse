@@ -34,6 +34,7 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
+WTS_URL="http://workspace-token-service.$NAMESPACE"
 WTS_URL=${WTS_OVERRIDE_URL:-"$WTS_URL"}
 echo "WTS_URL: $WTS_URL"
 WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
@@ -43,26 +44,29 @@ while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
     sleep 15
     WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 done
-
-default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+declare -a curlArgs
+if [ ! -z $WTS_OVERRIDE_URL ]; then
+    curlArgs=('-H' "Authorization: bearer ${ACCESS_TOKEN}")
+fi
+default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
 while [[ "$default_token" = null ]]; do
     echo "Unable to get token from '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
     echo $default_token
     sleep 15
-    default_token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" 2>/dev/null | jq -r '.token')
+    default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
 done
 declare -A TOKEN_JSON  # requires Bash 4
 TOKEN_JSON['default']=$default_token
 run_sidecar() {
     while true; do
-        token=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}"  2>/dev/null | jq -r '.token')
+        token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}"  2>/dev/null | jq -r '.token')
         if [[ ! -z "$token" ]]; then
             echo "got new token $token"
             TOKEN_JSON['default']=$token
         fi
 
         echo "got token from WTS: ${TOKEN_JSON['default']}"
-        wts_response=$(curl $WTS_URL/token/?idp=default -H "Authorization: bearer ${ACCESS_TOKEN}" )
+        wts_response=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" )
         echo "wts response: $wts_response"
 
         # get the list of IDPs the current user is logged into
@@ -116,7 +120,7 @@ query_manifest_service() {
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${ACCESS_TOKEN}" | jq -r '.token')
+        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${TOKEN_JSON['default']}" | jq -r '.token')
         resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
         echo "response from the manifest service $URL: $resp"
     fi
@@ -142,8 +146,16 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
-        if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP -access-token=$ACCESS_TOKEN >/proc/1/fd/1 2>/proc/1/fd/2); then
-            echo "gen3-fuse failed to mount."
+        # Check if we have an ACCESS_TOKEN mounted, this only gets mounted for external workspace pods
+        if [ -z $ACCESS_TOKEN ]; then
+            if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2); then
+                echo "gen3-fuse failed to mount."
+            fi
+        else
+            # When we are launching workspaces outside local kubernetes cluster, we need to supply an access token so fuse can talk to WTS
+            if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP -access-token=$ACCESS_TOKEN >/proc/1/fd/1 2>/proc/1/fd/2); then
+                echo "gen3-fuse failed to mount."
+            fi
         fi
     fi
 }
