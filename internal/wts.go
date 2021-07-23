@@ -69,7 +69,7 @@ type fenceAccessTokenResponse struct {
 var myClient = &http.Client{Timeout: 20 * time.Second}
 
 func getJson(url string, target interface{}, access_token string) (err error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	// add authorization header to the req
 	if access_token != "" {
 		req.Header.Add("Authorization", "Bearer "+access_token)
