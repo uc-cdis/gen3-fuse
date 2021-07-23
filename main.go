@@ -16,6 +16,7 @@ func main() {
 	wtsURL := flag.String("wtsURL", "", "workspace-token-service url")
 	wtsIDP := flag.String("wtsIDP", "", "workspace-token-service IDP to use (optional)")
 	apiKey := flag.String("api-key", "", "api key")
+	accessToken := flag.String("access-token", "", "access token (optional)")
 
 	flag.Parse()
 
@@ -29,7 +30,8 @@ func main() {
 				-hostname=<commons_domain> \
 				-wtsURL=<workspace_token_service_url> \
 				-wtsIDP=<workspace_token_service_idp> \
-				-api-key=<api_key>`)
+				-api-key=<api_key> \
+				-access-token=<access_token>`)
 		os.Exit(1)
 	}
 
@@ -76,6 +78,7 @@ func main() {
 	gen3FuseConfig.WTSBaseURL = *wtsURL
 	gen3FuseConfig.WTSIdp = *wtsIDP
 	gen3FuseConfig.ApiKey = *apiKey
+	gen3FuseConfig.AccessToken = *accessToken
 
 	gen3fuse.InitializeApp(gen3FuseConfig, *manifestFilePath, *mountPoint)
 }

@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# The below commands allow for enhanced logging.
+# All output from this script will be captured in the file at /data/$HOSTNAME/fuse-sidecar-logs.out
+# Note that this log file will be visible to the workspace user.
+mkdir "/data/$HOSTNAME/"
+touch "/data/$HOSTNAME/fuse-sidecar-logs.out"
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>"/data/$HOSTNAME/fuse-sidecar-logs.out" 2>&1
+
 # Only the most recent manifest is mounted.
 # If new manifests are added while the workspace is running,
 # only keep the N latest manifests for each IDP:
@@ -25,23 +34,46 @@ _jq() {
 
 sed -i "s/LogFilePath: \"fuse_log.txt\"/LogFilePath: \"\/data\/_manifest-sync-status.log\"/g" ~/fuse-config.yaml
 trap cleanup SIGTERM
-
-WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+WTS_URL="http://workspace-token-service.$NAMESPACE"
+WTS_URL=${WTS_OVERRIDE_URL:-"$WTS_URL"}
+echo "WTS_URL: $WTS_URL"
+WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
+echo "WTS STATUS: $WTS_STATUS"
 while [[ ( "$WTS_STATUS" -ne 200 ) ]]; do
-    echo "Unable to reach WTS at 'http://workspace-token-service.$NAMESPACE', or WTS is not healthy. Wait 15s and retry."
+    echo "Unable to reach WTS at '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
     sleep 15
-    WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" http://workspace-token-service.$NAMESPACE/_status)
+    WTS_STATUS=$(curl -s -o /dev/null -I -w "%{http_code}" $WTS_URL/_status)
 done
-
+declare -a curlArgs
+if [ ! -z $WTS_OVERRIDE_URL ]; then
+    curlArgs=('-H' "Authorization: bearer ${ACCESS_TOKEN}")
+fi
+default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
+while [[ "$default_token" = null ]]; do
+    echo "Unable to get token from '$WTS_URL', or WTS is not healthy. Wait 15s and retry."
+    echo $default_token
+    sleep 15
+    default_token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" 2>/dev/null | jq -r '.token')
+done
 declare -A TOKEN_JSON  # requires Bash 4
-TOKEN_JSON['default']=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=default 2>/dev/null | jq -r '.token')
-
+TOKEN_JSON['default']=$default_token
 run_sidecar() {
     while true; do
+        token=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}"  2>/dev/null | jq -r '.token')
+        if [[ ! -z "$token" ]]; then
+            echo "got new token $token"
+            TOKEN_JSON['default']=$token
+        fi
+
+        echo "got token from WTS: ${TOKEN_JSON['default']}"
+        wts_response=$(curl $WTS_URL/token/?idp=default "${curlArgs[@]}" )
+        echo "wts response: $wts_response"
+
         # get the list of IDPs the current user is logged into
-        EXTERNAL_OIDC=$(curl http://workspace-token-service.$NAMESPACE/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
+        EXTERNAL_OIDC=$(curl $WTS_URL/external_oidc/?unexpired=true -H "Authorization: bearer ${TOKEN_JSON['default']}" 2>/dev/null | jq -r '.providers')
         IDPS=( "default" )
         BASE_URLS=( "https://$HOSTNAME" )
+
         for ROW in $(jq -r '.[] | @base64' <<< ${EXTERNAL_OIDC}); do
             IDPS+=( $(_jq ${ROW} .idp) )
             BASE_URLS+=( $(_jq ${ROW} .base_url) )
@@ -82,13 +114,15 @@ query_manifest_service() {
     # This function populates a return value in a variable called $resp
     URL=$1
 
-    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+    resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+    echo "manifest service response: $resp"
 
     # if access token is expired, get a new one and try again
     if [[ $(jq -r '.error' <<< $resp) =~ 'log' ]]; then
         echo "Getting new token for IDP '$IDP'"
-        TOKEN_JSON[$IDP]=$(curl http://workspace-token-service.$NAMESPACE/token/?idp=$IDP 2>/dev/null | jq -r '.token')
-        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}" 2>/dev/null)
+        TOKEN_JSON[$IDP]=$(curl $WTS_URL/token/?idp=$IDP -H "Authorization: bearer ${TOKEN_JSON['default']}" | jq -r '.token')
+        resp=$(curl $URL -H "Authorization: bearer ${TOKEN_JSON[$IDP]}")
+        echo "response from the manifest service $URL: $resp"
     fi
 }
 
@@ -112,7 +146,17 @@ mount_manifest() {
     # gen3-fuse mounts the files in /data/<hostname> dir
     if [ ! -d $IDP_DATA_PATH/$MOUNT_NAME ]; then
         echo "Mounting manifest at $IDP_DATA_PATH/$MOUNT_NAME"
-        gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=http://workspace-token-service.$NAMESPACE -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2
+        # Check if we have an ACCESS_TOKEN mounted, this only gets mounted for external workspace pods
+        if [ -z $ACCESS_TOKEN ]; then
+            if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP >/proc/1/fd/1 2>/proc/1/fd/2); then
+                echo "gen3-fuse failed to mount."
+            fi
+        else
+            # When we are launching workspaces outside local kubernetes cluster, we need to supply an access token so fuse can talk to WTS
+            if (! gen3-fuse -config=/fuse-config.yaml -manifest=$PATH_TO_MANIFEST -mount-point=$IDP_DATA_PATH/$MOUNT_NAME -hostname=$BASE_URL -wtsURL=$WTS_URL -wtsIDP=$IDP -access-token=$ACCESS_TOKEN >/proc/1/fd/1 2>/proc/1/fd/2); then
+                echo "gen3-fuse failed to mount."
+            fi
+        fi
     fi
 }
 
@@ -122,12 +166,14 @@ check_for_new_manifests() {
     IDP=$3
     BASE_URL=$4
     TOKEN_JSON=$5
-
+    echo "querying manifest service at $BASE_URL/manifests/"
     resp='' # The below function populates this variable
     query_manifest_service $BASE_URL/manifests/
 
+
     # get the name of the most recent manifest
     MANIFEST_NAME=$(jq --raw-output .manifests[-1].filename <<< $resp)
+    echo "most recent manifest name: $MANIFEST_NAME"
     if [[ $? != 0 ]]; then
         echo "Manifest service endpoint at $BASE_URL/manifests/ did not return JSON. Maybe it's not configured?"
         return

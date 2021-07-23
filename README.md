@@ -55,7 +55,7 @@ You can choose where errors are logged in the yaml config file. By default they 
     -wtsIDP=<workspace_token_service_IDP> \
     -api-key=<api_key>
 
-Note the usage of the program above. All arguments are required except `wtsURL` and `api-key`.
+Note the usage of the program above. All arguments are required except `wtsURL`, `wtsIDP`, and `api-key`.
 You must provide at least one of `wtsURL` or `api-key` in order for Gen3Fuse to work,
 because Gen3Fuse must obtain access tokens using one of those methods.
 If both arguments are provided, then the `api-key` takes precedence and Gen3Fuse gets a token
@@ -94,6 +94,27 @@ If you've already performed the Gen3Fuse setup instructions listed above, you ca
 ## Gen3Fuse sidecar
 
 The Gen3 workspace flow uses the Gen3Fuse sidecar to handle mounting files to the workspace. The sidecar code iterates through the IDPs made available by the workspace-token-service, obtains an access token from the WTS for the current user, and checks whether the user has uploaded a new manifest via the IDP's [manifest-service](https://github.com/uc-cdis/manifestservice). If it's the case, the Gen3Fuse CLI is then used to mount the files to the workspace.
+
+## External Hosts and the DRS API
+
+Manifest entries can optionally contain a `commons_url` field. This field indicates that the object ID in question points to a record in an external host -- that is, a host other than the URL specified in the Gen3Fuse command line parameter `hostname`. This functionality allows for users to mount files from multiple data repositories. External hosts are expected to support the [Data Repository Service API](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-0.1.0/docs/). To enable interaction with external hosts, the Workspace Token Service of the FUSE host should be configured to serve access tokens for each external IDP. Below is an example of a manifest containing files from multiple hosts. Note that various hostname formats are accepted.
+
+    [
+        {
+            "object_id": "ab.0000/1234-5678",
+            "commons_url": "https://science.datacommons.io/"
+          },
+          {
+            "object_id": "ab.0001/1234-5678"
+          },
+          {
+            "object_id": "ab.0002/1234-5678",
+            "commons_url": "external.sciencedata.org"
+          }
+        ]
+
+Presigned URLs for entries that lack the commons_url field, like `ab.0001/1234-5678` in the example above, will be retrieved from the FUSE commons Fence like usual.
+
 
 ## Performance tests
 Below are the results of a set of performance tests. Each chosen x axis value was tested 5 times, the results are shown in the scatter.

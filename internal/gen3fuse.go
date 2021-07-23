@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,25 +28,31 @@ type Gen3Fuse struct {
 
 	DIDs []string
 
+	DIDsToCommonsHostnames map[string]string
+
 	inodes map[fuseops.InodeID]*inodeInfo
 
 	gen3FuseConfig *Gen3FuseConfig
+
+	ExternalIDPTokens map[string]string
 }
 
 type ManifestRecord struct {
-	ObjectId  string `json:"object_id"`
-	SubjectId string `json:"subject_id"`
-	Uuid      string `json:"uuid"`
+	CommonsHostname string `json:"commons_url"`
+	ObjectId        string `json:"object_id"`
+	SubjectId       string `json:"subject_id"`
+	Uuid            string `json:"uuid"`
 }
 
-type IndexdResponse struct {
-	Filename string   `json:"file_name"`
-	Filesize uint64   `json:"size"`
-	DID      string   `json:"did"`
-	URLs     []string `json:"urls"`
+type FileInfo struct {
+	Filename         string   `json:"file_name"`
+	Filesize         uint64   `json:"size"`
+	DID              string   `json:"did"`
+	URLs             []string `json:"urls"`
+	FromExternalHost bool
 }
 
-// APIError carriese a failure to get a 2XX response
+// APIError carries a failure to get a 2XX response
 type APIError struct {
 	StatusCode int
 	URL        string
@@ -75,7 +82,8 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		return nil, err
 	}
 
-	var didToFileInfo map[string]*IndexdResponse
+	var didToFileInfo map[string]*FileInfo
+
 	if len(fs.DIDs) == 0 {
 		FuseLog(fmt.Sprintf("Warning: no DIDs were obtained from the manifest %v.", manifestFilePath))
 	} else {
@@ -83,7 +91,17 @@ func NewGen3Fuse(ctx context.Context, gen3FuseConfig *Gen3FuseConfig, manifestFi
 		if err != nil {
 			return nil, err
 		}
+	}
 
+	for IDP, _ := range fs.ExternalIDPTokens {
+		token, err := GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
+		if err != nil {
+			FuseLog(fmt.Sprintf("Failed to retrieve access token from WTS for External Host IDP %v.", IDP))
+			continue
+		}
+		fs.ExternalIDPTokens[IDP] = token
+
+		FuseLog(fmt.Sprintf("\nGot a token for %v - %v", IDP, token))
 	}
 
 	fs.inodes = InitializeInodes(didToFileInfo)
@@ -108,6 +126,12 @@ type inodeInfo struct {
 
 	// For files, the presigned URL
 	presignedUrl string
+
+	// Indicates whether the object info is from a source other than Indexd
+	FromExternalHost bool
+
+	// For DRS files -- the access URL(s) that yields a presigned URL for the file when given an auth token
+	ExternalAccessURLs []string
 }
 
 func getFilePathFromURL(urls []string) (result []string, ok bool) {
@@ -134,12 +158,13 @@ func getFilePathFromURL(urls []string) (result []string, ok bool) {
 	return filePaths[1:len(filePaths)], true
 }
 
-func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.InodeID]*inodeInfo {
+func InitializeInodes(didToFileInfo map[string]*FileInfo) map[fuseops.InodeID]*inodeInfo {
 	/*
 		Create a file system with a fixed structure described by the manifest
 		If you're trying to read this code and understand it, maybe check out the hello world FUSE sample first:
 		https://github.com/jacobsa/fuse/blob/master/samples/hellofs/hello_fs.go
 	*/
+
 	FuseLog("Inside InitializeInodes")
 	const (
 		rootInode fuseops.InodeID = fuseops.RootInodeID + iota
@@ -210,29 +235,42 @@ func InitializeInodes(didToFileInfo map[string]*IndexdResponse) map[fuseops.Inod
 			continue
 		}
 
+		externalURLs := []string{}
+		if fileInfo.FromExternalHost {
+			externalURLs = fileInfo.URLs
+		}
+
 		// inode for by-id file
 		// GUIDs can have prefix as folders
 		guidPaths := append([]string{"by-guid"}, strings.Split(did, "/")...)
-		inodeID = createInodeForDirs(inodes, inodeID, guidPaths, inodeIDMap, did, fileInfo.Filesize)
+		inodeID = createInodeForDirs(inodes, inodeID, guidPaths, inodeIDMap, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 
 		inodeID++
 
 		// Try to get the filename from the first URL
 		paths, ok := getFilePathFromURL(fileInfo.URLs)
+		if fileInfo.FromExternalHost {
+			paths = []string{fileInfo.Filename}
+			ok = true
+		}
 
 		if !ok {
 			continue
 		}
 		filename := paths[len(paths)-1]
-		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize)
+		if len(fileInfo.Filename) > 0 {
+			filename = fileInfo.Filename
+		}
+
+		createInode(inodes, byFilenameDir, inodeID, filename, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 		inodeID++
 		paths = append([]string{"by-filepath"}, paths...)
-		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize)
+		inodeID = createInodeForDirs(inodes, inodeID, paths, inodeIDMap, did, fileInfo.Filesize, fileInfo.FromExternalHost, externalURLs)
 	}
 	return inodes
 }
 
-func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.InodeID, paths []string, inodeIDMap map[string]fuseops.InodeID, did string, filesize uint64) fuseops.InodeID {
+func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.InodeID, paths []string, inodeIDMap map[string]fuseops.InodeID, did string, filesize uint64, fromExternalHost bool, externalURLs []string) fuseops.InodeID {
 	for i := 0; i <= len(paths)-1; i++ {
 		filename := paths[i]
 		fullpath := strings.Join(paths[0:i+1], "/")
@@ -240,7 +278,6 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		// this folder is already created in another guid lookup
 		_, ok := inodeIDMap[fullpath]
 		if ok {
-			FuseLog(fmt.Sprintf("%v Already exists", fullpath))
 			continue
 		}
 		parentNode, ok := inodeIDMap[parentpath]
@@ -250,10 +287,10 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 		}
 		if i == len(paths)-1 {
 			// leaf file
-			createInode(inodes, parentNode, inodeID, filename, did, filesize)
+			createInode(inodes, parentNode, inodeID, filename, did, filesize, fromExternalHost, externalURLs)
 		} else {
 			// intermediate directory
-			createInode(inodes, parentNode, inodeID, filename, "", 0)
+			createInode(inodes, parentNode, inodeID, filename, "", 0, false, nil)
 		}
 		inodeIDMap[fullpath] = inodeID
 		inodeID++
@@ -261,7 +298,7 @@ func createInodeForDirs(inodes map[fuseops.InodeID]*inodeInfo, inodeID fuseops.I
 	return inodeID
 }
 
-func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64) {
+func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID, inodeID fuseops.InodeID, filename string, did string, filesize uint64, fromExternalHost bool, externalURLs []string) {
 	parent, ok := inodes[parentID]
 	if !ok {
 		panic(fmt.Sprintf("Something went wrong, can't find parent folder for %v, guid %v", filename, did))
@@ -300,8 +337,10 @@ func createInode(inodes map[fuseops.InodeID]*inodeInfo, parentID fuseops.InodeID
 				Mode:  0444,
 				Size:  filesize,
 			},
-			Name: filename,
-			DID:  did,
+			Name:               filename,
+			DID:                did,
+			FromExternalHost:   fromExternalHost,
+			ExternalAccessURLs: externalURLs,
 		}
 	}
 }
@@ -320,6 +359,16 @@ func findChildInode(
 	return
 }
 
+func GetIDPForURL(URL string) (IDP string) {
+	if strings.Contains(URL, "jcoin") {
+		return "jcoin-google"
+	}
+	if strings.Contains(URL, "healdata") {
+		return "externaldata-google"
+	}
+	return ""
+}
+
 func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	FuseLog(fmt.Sprintf("Inside LoadDIDsFromManifest, loading manifest from %v", manifestFilePath))
 	b, err := ioutil.ReadFile(manifestFilePath)
@@ -334,9 +383,26 @@ func (fs *Gen3Fuse) LoadDIDsFromManifest(manifestFilePath string) (err error) {
 	manifestJSON := make([]ManifestRecord, 0)
 	json.Unmarshal(sReplaceNoneAsBytes, &manifestJSON)
 
+	fs.DIDsToCommonsHostnames = make(map[string]string)
+	fs.ExternalIDPTokens = make(map[string]string)
+	externalHostnames := make(map[string]string)
 	for i := 0; i < len(manifestJSON); i++ {
 		fs.DIDs = append(fs.DIDs, manifestJSON[i].ObjectId)
+		if len(manifestJSON[i].CommonsHostname) > 0 {
+			fs.DIDsToCommonsHostnames[manifestJSON[i].ObjectId] = manifestJSON[i].CommonsHostname
+			// Using a map as a set
+			externalHostnames[manifestJSON[i].CommonsHostname] = ""
+		}
 	}
+
+	for k, _ := range externalHostnames {
+		IDP := GetIDPForURL(k)
+		if len(IDP) > 0 {
+			// Initializing the keys of the IDP->Token map
+			fs.ExternalIDPTokens[IDP] = ""
+		}
+	}
+
 	return
 }
 
@@ -458,7 +524,7 @@ func (fs *Gen3Fuse) OpenFile(
 	}
 
 	if info.presignedUrl == "" || len(info.presignedUrl) < 3 {
-		presignedUrl, err := fs.GetPresignedURL(info.DID)
+		presignedUrl, err := fs.GetPresignedURL(info)
 		if err != nil {
 			return err
 		}
@@ -487,7 +553,7 @@ func (fs *Gen3Fuse) ReadFile(
 		// aws returns 403 when URL is expired
 		if apiErr.StatusCode == 403 {
 			FuseLog(fmt.Sprintf("Get a fresh url for %v", info.DID))
-			presignedURL, urlErr := fs.GetPresignedURL(info.DID)
+			presignedURL, urlErr := fs.GetPresignedURL(info)
 			if urlErr != nil {
 				FuseLog("Error fetching file contents: " + urlErr.Error())
 				err = fuse.ENOENT
@@ -535,8 +601,90 @@ type presignedURLResponse struct {
 	Url string
 }
 
-func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error) {
-	FuseLog("Inside GetPresignedURL")
+func (fs *Gen3Fuse) GetPresignedURLFromExternalHost(info *inodeInfo) (presignedUrl string, err error) {
+	FuseLog(fmt.Sprintf("Inside GetPresignedURLFromExternalHost with %s", info.DID))
+	// The below code talks to the DRS API instead of Fence to get a presigned URL
+	DID := info.DID
+	if len(info.ExternalAccessURLs) < 1 {
+		FuseLog(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
+		return "", errors.New(fmt.Sprintf("Error: The record %v is from an external host, but lacks ExternalAccessURLs.", DID))
+	}
+	drsRequestURL := info.ExternalAccessURLs[0]
+	FuseLog("GET " + drsRequestURL)
+
+	req, err := http.NewRequest("GET", drsRequestURL, nil)
+
+	accessToken := fs.accessToken
+	IDP := GetIDPForURL(drsRequestURL)
+	if len(IDP) < 1 {
+		FuseLog(fmt.Sprintf("Failed to determine IDP for URL %v", drsRequestURL))
+	} else {
+		accessToken = fs.ExternalIDPTokens[IDP]
+
+		FuseLog(fmt.Sprintf("Got an access token for IDP %v: %v", IDP, accessToken))
+	}
+
+	req.Header.Add("Authorization", "Bearer "+accessToken)
+	req.Header.Add("Accept", "application/json")
+
+	if err != nil {
+		FuseLog(err.Error() + " (" + DID + ") ")
+		return "", err
+	}
+	resp, err := myClient.Do(req)
+
+	if err != nil {
+		FuseLog(err.Error() + " (" + DID + ") ")
+		return "", err
+	}
+
+
+	FuseLog(fmt.Sprintf("Response from drsRequestURL %v: %v\n", drsRequestURL, resp))
+	if resp.StatusCode == 200 {
+		return fs.URLFromSuccessResponse(resp), nil
+	} else if resp.StatusCode == 401 {
+		// refresh the access token and try again just one more time
+		FuseLog("Got 401, retrying...")
+		accessToken, err = GetAccessTokenFromWTSForExternalHost(fs.gen3FuseConfig, IDP)
+		if err != nil {
+			return "", err
+		}
+
+		FuseLog("GET " + drsRequestURL)
+		req, err := http.NewRequest("GET", drsRequestURL, nil)
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+		req.Header.Add("Accept", "application/json")
+
+		if err != nil {
+			FuseLog(err.Error() + " (" + DID + ") ")
+			return "", err
+		}
+		resp, err := myClient.Do(req)
+
+		if err != nil {
+			FuseLog(err.Error() + " (" + DID + ") ")
+			return "", err
+		}
+
+		FuseLog(fmt.Sprintf("Response from drsRequestURL: %v\n", resp))
+		if resp.StatusCode == 200 {
+			return fs.URLFromSuccessResponse(resp), nil
+		} else {
+			FuseLog(fmt.Sprintf("After refreshing the access token, external host %v still returns status code %d when asked for a presigned URL.", drsRequestURL, resp.StatusCode))
+			FuseLog("The full error page is below:\n")
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			bodyString := string(bodyBytes)
+			FuseLog(bodyString)
+			return "", nil
+		}
+	}
+	return "", nil
+}
+
+func (fs *Gen3Fuse) GetPresignedURLFromFence(info *inodeInfo) (presignedUrl string, err error) {
+	FuseLog(fmt.Sprintf("Inside GetPresignedURLFromFence with %s", info.DID))
+	DID := info.DID
+	// The below code talks to the Fence microservice (case where info.FromExternalHost == false)
 	resp, err := fs.FetchURLResponseFromFence(DID)
 	if err != nil {
 		return "", err
@@ -545,9 +693,9 @@ func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		return fs.URLFromSuccessResponseFromFence(resp), nil
+		return fs.URLFromSuccessResponse(resp), nil
 	} else if resp.StatusCode == 401 {
-		// get a new access token, try again just one more time
+		// refresh the access token and try again just one more time
 		FuseLog("Got 401, retrying...")
 		fs.accessToken, err = GetAccessToken(fs.gen3FuseConfig)
 		if err != nil {
@@ -561,11 +709,22 @@ func (fs *Gen3Fuse) GetPresignedURL(DID string) (presignedUrl string, err error)
 		defer respRetry.Body.Close()
 
 		if resp.StatusCode == 200 {
-			return fs.URLFromSuccessResponseFromFence(resp), nil
+			return fs.URLFromSuccessResponse(resp), nil
 		}
 	}
 
 	return "", fs.HandleFenceError(resp)
+}
+
+func (fs *Gen3Fuse) GetPresignedURL(info *inodeInfo) (presignedUrl string, err error) {
+	if info.FromExternalHost {
+		rv, err := fs.GetPresignedURLFromExternalHost(info)
+		FuseLog("Got url from external host")
+		FuseLog(rv)
+		return rv, err
+	} else {
+		return fs.GetPresignedURLFromFence(info)
+	}
 }
 
 func (fs *Gen3Fuse) HandleFenceError(resp *http.Response) (err error) {
@@ -616,7 +775,7 @@ func (fs *Gen3Fuse) FetchURLResponseFromFence(DID string) (response *http.Respon
 	return resp, nil
 }
 
-func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presignedUrl string) {
+func (fs *Gen3Fuse) URLFromSuccessResponse(resp *http.Response) (presignedUrl string) {
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	bodyString := string(bodyBytes)
 
@@ -625,61 +784,193 @@ func (fs *Gen3Fuse) URLFromSuccessResponseFromFence(resp *http.Response) (presig
 	return urlResponse.Url
 }
 
-func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*IndexdResponse, err error) {
-	requestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
-	var DIDsWithQuotes []string
-	didToFileInfo = make(map[string]*IndexdResponse, 0)
+func (fs *Gen3Fuse) GetExternalHostFileInfos(didsWithExternalInfo []string, didToFileInfo map[string]*FileInfo) (didToFileInfoModified map[string]*FileInfo, err error) {
+	// Manifest entries with a commons_url field filled out have FileInfo metadata
+	// in a location other than Indexd. This function retrieves that metadata.
+	// Currently supporting DRS objects with metadata in the JCOIN commons.
+
+	for i := 0; i < len(didsWithExternalInfo); i += 1 {
+		did := didsWithExternalInfo[i]
+		commonsHostname := fs.DIDsToCommonsHostnames[did]
+		// For now, we assume that all entries with a commons_url support the DRS API.
+		if commonsHostname[len(commonsHostname)-1:] != "/" {
+			commonsHostname = commonsHostname + "/"
+		}
+		// Flexibility with hostname formats
+		if !(strings.HasPrefix(commonsHostname, "http://") && strings.HasPrefix(commonsHostname, "https://")) {
+			commonsHostname = "https://" + commonsHostname
+		}
+
+		drsRequestURL := commonsHostname + "ga4gh/drs/v1/objects/" + did
+		fmt.Println(drsRequestURL)
+
+		timeout := time.Duration(4 * time.Second)
+		client := http.Client{
+			Timeout: timeout,
+		}
+
+		req, err := http.NewRequest("GET", drsRequestURL, nil)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			FuseLog(err.Error())
+			continue
+		}
+		resp, err := client.Do(req)
+
+		if err != nil {
+			FuseLog(err.Error())
+			continue
+		}
+
+		if resp.StatusCode != 200 {
+			FuseLog(fmt.Sprintf("Error: Failed to retrieve file info from %s with status code %d", drsRequestURL, resp.StatusCode))
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyString := string(bodyBytes)
+
+		// get json as a map with interface{}
+		jsonMap := make(map[string](interface{}))
+		err = json.Unmarshal([]byte(bodyString), &jsonMap)
+		if err != nil {
+			FuseLog(fmt.Sprintf("ERROR: Failed to unmarshal external host file info JSON, %s", err.Error()))
+			return nil, err
+		}
+
+		fileInfo := &FileInfo{DID: did, FromExternalHost: true}
+
+		name, ok := jsonMap["name"].(string)
+		if ok {
+			fileInfo.Filename = name
+		}
+
+		size, ok := jsonMap["size"].(float64)
+		if ok {
+			fileInfo.Filesize = uint64(size)
+		}
+
+		// The below code indexes deeper into the DRS API response to obtain access information.
+		// Because we unmarshalled the JSON without specifying a fixed structure, we test
+		// the type of each nested value before indexing deeper into the value.
+		// The result is verbose.
+		accessMethods, ok := jsonMap["access_methods"].([](interface{}))
+		accessMethodsMap, ok := accessMethods[0].(map[string]interface{})
+		accessMethod := ""
+		accessURL := ""
+		if ok {
+			accessMethodTest := accessMethodsMap["type"]
+			accessMethod, ok = accessMethodTest.(string)
+
+			accessURLsTest := accessMethodsMap["access_url"]
+			accessURLs, ok := accessURLsTest.(map[string]interface{})
+
+			if ok {
+				accessURLTest, ok := accessURLs["url"].(string)
+				if ok {
+					accessURL = accessURLTest
+				}
+			}
+		}
+
+		if len(fileInfo.Filename) < 1 && len(accessURL) > 0 {
+			arg := []string{accessURL}
+			val, ok := getFilePathFromURL(arg)
+
+			if ok && len(val) > 0 {
+				filename := strings.Join(val, "_")
+				fileInfo.Filename = filename
+			}
+		}
+
+		if accessMethod == "s3" {
+			uri := drsRequestURL + "/access/s3"
+			fileInfo.URLs = []string{uri}
+		} else {
+			FuseLog(fmt.Sprintf("Found unrecognized access_method in DRS response: %s", accessMethod))
+		}
+
+		didToFileInfo[did] = fileInfo
+	}
+	return didToFileInfo, nil
+}
+
+func (fs *Gen3Fuse) GetFileNamesAndSizes() (didToFileInfo map[string]*FileInfo, err error) {
+	indexdRequestURL := fs.gen3FuseConfig.Hostname + fs.gen3FuseConfig.IndexdBulkFileInfoPath
+	var DIDsWithIndexdInfo []string
+	var DIDsWithFileInfoFromExternalHosts []string
+	didToFileInfo = make(map[string]*FileInfo, 0)
 	FuseLog(fmt.Sprintf("Getting %v records", len(fs.DIDs)))
 	for i := 0; i < len(fs.DIDs); i += 1000 {
 		last := i + 1000
 		if len(fs.DIDs) < last {
 			last = len(fs.DIDs)
 		}
-		DIDsWithQuotes = []string{}
+		DIDsWithIndexdInfo = []string{}
+
 		for _, x := range fs.DIDs[i:last] {
-			DIDsWithQuotes = append(DIDsWithQuotes, "\""+x+"\"")
+			if _, ok := fs.DIDsToCommonsHostnames[x]; ok {
+				FuseLog(fmt.Sprintf("Added %#v to externals\n", x))
+				DIDsWithFileInfoFromExternalHosts = append(DIDsWithFileInfoFromExternalHosts, x)
+			} else {
+				FuseLog(fmt.Sprintf("Added %#v to indexd list\n", x))
+				DIDsWithIndexdInfo = append(DIDsWithIndexdInfo, "\""+x+"\"")
+			}
 		}
 
-		postData := "[ " + strings.Join(DIDsWithQuotes, ",") + " ]"
+		if len(DIDsWithIndexdInfo) > 0 {
+			postData := "[ " + strings.Join(DIDsWithIndexdInfo, ",") + " ]"
 
-		FuseLog(fmt.Sprintf("POST %v with %v - %v records", requestURL, i, last))
+			FuseLog(fmt.Sprintf("POST %v with %v records from window %v - %v", indexdRequestURL, len(DIDsWithIndexdInfo), i, last))
 
-		// Decent timeout because there might be lots of files to list
-		timeout := time.Duration(60 * time.Second)
-		client := http.Client{
-			Timeout: timeout,
+			// Decent timeout because there might be lots of files to list
+			timeout := time.Duration(60 * time.Second)
+			client := http.Client{
+				Timeout: timeout,
+			}
+
+			req, err := http.NewRequest("POST", indexdRequestURL, bytes.NewBuffer([]byte(postData)))
+			req.Header.Set("Content-Type", "application/json")
+
+			if err != nil {
+				FuseLog(err.Error())
+				return nil, err
+			}
+			resp, err := client.Do(req)
+
+			if err != nil {
+				FuseLog(err.Error())
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				return nil, fs.HandleIndexdError(resp)
+
+			}
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			bodyString := string(bodyBytes)
+
+			didToFileInfoList := make([]*FileInfo, 0)
+			json.Unmarshal([]byte(bodyString), &didToFileInfoList)
+
+			for _, fileInfo := range didToFileInfoList {
+				didToFileInfo[fileInfo.DID] = fileInfo
+			}
 		}
 
-		req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer([]byte(postData)))
-		req.Header.Set("Content-Type", "application/json")
+		if len(DIDsWithFileInfoFromExternalHosts) > 0 {
+			// Now get the DRS file infos
+			didToFileInfo, err = fs.GetExternalHostFileInfos(DIDsWithFileInfoFromExternalHosts, didToFileInfo)
 
-		if err != nil {
-			FuseLog(err.Error())
-			return nil, err
+			if err != nil {
+				FuseLog(fmt.Sprintf("Error: failed to retrieve external host file infos. %v ", err))
+				return nil, err
+			}
 		}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			FuseLog(err.Error())
-			return nil, err
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return nil, fs.HandleIndexdError(resp)
-
-		}
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
-		bodyString := string(bodyBytes)
-
-		didToFileInfoList := make([]*IndexdResponse, 0)
-		json.Unmarshal([]byte(bodyString), &didToFileInfoList)
-
-		for _, i := range didToFileInfoList {
-			didToFileInfo[i.DID] = i
-		}
-
 	}
 	return didToFileInfo, nil
 }
@@ -731,8 +1022,8 @@ func FetchContentsAtURL(presignedUrl string, offset int64, size int64, fullsize 
 
 func FuseLog(message string) {
 
-        // Log messages to stdout too
-        fmt.Println(message)
+	// Log messages to stdout too
+	fmt.Println(message)
 
 	file, err := os.OpenFile(LogFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0664)
 	if err != nil {

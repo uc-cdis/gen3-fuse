@@ -32,6 +32,9 @@ type Gen3FuseConfig struct {
 
 	// An optional parameter the user can provide to retrieve access tokens from Fence
 	ApiKey string
+
+	// An optional parameter the user can provide to talk to WTS from outside the k8s cluster
+	AccessToken string
 }
 
 func NewGen3FuseConfigFromYaml(filename string) (gen3FuseConfig *Gen3FuseConfig, err error) {
@@ -65,8 +68,13 @@ type fenceAccessTokenResponse struct {
 
 var myClient = &http.Client{Timeout: 20 * time.Second}
 
-func getJson(url string, target interface{}) (err error) {
-	r, err := myClient.Get(url)
+func getJson(url string, target interface{}, access_token string) (err error) {
+	req, _ := http.NewRequest("GET", url, nil)
+	// add authorization header to the req
+	if access_token != "" {
+		req.Header.Add("Authorization", "Bearer "+access_token)
+	}
+	r, err := myClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -91,7 +99,7 @@ func GetAccessToken(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err err
 	}
 
 	// only consult WTS if no api key provided
-	return GetAccessTokenFromWTS(gen3FuseConfig)
+	return GetAccessTokenFromWTS(gen3FuseConfig, "")
 }
 
 func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
@@ -107,7 +115,7 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 	defer r.Body.Close()
 
 	if r.StatusCode != 200 {
-		FuseLog(fmt.Sprintf("Error obtaining access token from the Fence at %v", requestUrl))
+		FuseLog(fmt.Sprintf("Error obtaining access token from Fence at %v", requestUrl))
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		bodyString := string(bodyBytes)
 		FuseLog(bodyString)
@@ -120,13 +128,22 @@ func GetAccessTokenWithApiKey(gen3FuseConfig *Gen3FuseConfig) (accessToken strin
 	return fenceTokenResponse.Token, nil
 }
 
-func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig) (accessToken string, err error) {
+func GetAccessTokenFromWTSForExternalHost(gen3FuseConfig *Gen3FuseConfig, IDP string) (accessToken string, err error) {
+	return GetAccessTokenFromWTS(gen3FuseConfig, IDP)
+}
+
+func GetAccessTokenFromWTS(gen3FuseConfig *Gen3FuseConfig, idpInput string) (accessToken string, err error) {
 	requestUrl := fmt.Sprint(gen3FuseConfig.WTSBaseURL + gen3FuseConfig.WTSAccessTokenPath)
-	if gen3FuseConfig.WTSIdp != "" {
-		requestUrl += "?idp=" + gen3FuseConfig.WTSIdp
+	WTSIdp := gen3FuseConfig.WTSIdp
+	if len(idpInput) > 0 {
+		WTSIdp = idpInput
+	}
+	if len(WTSIdp) > 0 {
+		requestUrl += "?idp=" + WTSIdp
 	}
 	tokenResponse := new(tokenResponse)
-	err = getJson(requestUrl, tokenResponse)
+	access_token := gen3FuseConfig.AccessToken
+	err = getJson(requestUrl, tokenResponse, access_token)
 
 	if len(tokenResponse.Token) == 0 || err != nil {
 		FuseLog("Error obtaining access token from the workspace token service at " + requestUrl)
