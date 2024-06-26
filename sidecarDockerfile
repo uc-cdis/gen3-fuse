@@ -1,6 +1,7 @@
 FROM quay.io/cdis/golang:1.22-bullseye
 
-RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python3-dev py-pip libffi-dev
+RUN apt-get update \
+    && apt-get install git ca-certificates gcc fuse jq curl
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
