@@ -1,12 +1,16 @@
 FROM quay.io/cdis/golang:1.22-bullseye
 
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
 RUN apt-get update \
-    && apt-get install git ca-certificates gcc fuse jq curl
+    && apt-get install -y git ca-certificates gcc fuse jq curl python3 python3-pip
 
 RUN mkdir -p $GOPATH/src/github.com/uc-cdis/gen3-fuse
 WORKDIR $GOPATH/src/github.com/uc-cdis/gen3-fuse
 COPY . .
-RUN go build -ldflags "-linkmode external -extldflags -static"
+RUN go build
 
 RUN mv $GOPATH/src/github.com/uc-cdis/gen3-fuse/gen3-fuse /usr/local/bin/gen3-fuse
 
