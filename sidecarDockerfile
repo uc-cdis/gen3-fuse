@@ -1,4 +1,4 @@
-FROM quay.io/cdis/golang:1.12-alpine
+FROM quay.io/cdis/golang:1.22-bullseye
 
 RUN apk update && apk add --no-cache git ca-certificates gcc musl-dev git fuse jq curl bash python3-dev py-pip libffi-dev
 
